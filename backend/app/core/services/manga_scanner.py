@@ -419,12 +419,20 @@ class MangaScanner:
             
         except Exception as e:
             print(f"❌ Erro ao salvar cache: {e}")
-    
+
     def _restore_manga_from_cache(self, manga_data: Dict) -> Optional[Manga]:
         """Restaurar mangá do cache e recriar páginas sob demanda"""
         try:
             # Restaurar dados básicos
             manga = Manga(**manga_data)
+            
+            # ✅ CORREÇÃO: Se não tem thumbnail no cache, buscar novamente
+            if not manga.thumbnail:
+                manga_path = Path(manga.path)
+                if manga_path.exists():
+                    print(f"🔍 Buscando thumbnail para {manga.title}...")
+                    manga.thumbnail = self._find_thumbnail(manga_path)
+                    print(f"📸 Thumbnail encontrada: {manga.thumbnail}")
             
             # Recriar páginas sob demanda para cada capítulo
             for chapter in manga.chapters:
@@ -444,6 +452,7 @@ class MangaScanner:
             print(f"⚠️ Erro ao restaurar mangá do cache: {e}")
             return None
     
+
     def _create_lightweight_manga_for_cache(self, manga: Manga) -> Dict:
         """Criar versão leve do mangá para cache (sem páginas individuais)"""
         # Criar cópia leve sem páginas detalhadas
@@ -467,7 +476,8 @@ class MangaScanner:
             "id": manga.id,
             "title": manga.title,
             "path": manga.path,
-            "thumbnail": manga.thumbnail,
+            # ✅ CORREÇÃO: Garantir que thumbnail seja preservada
+            "thumbnail": manga.thumbnail,  # CRÍTICO: Manter thumbnail no cache
             "chapters": lightweight_chapters,
             "chapter_count": manga.chapter_count,
             "total_pages": manga.total_pages,
@@ -482,7 +492,7 @@ class MangaScanner:
         
         return lightweight_manga
 
-    # === MÉTODOS ORIGINAIS PRESERVADOS ===
+    # === MÉTODOS ORIGINAIS ===
     
     def _scan_library_original(self, library_path: str) -> Library:
         """Método original preservado como fallback"""

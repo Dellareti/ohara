@@ -292,23 +292,30 @@ async def get_library():
     # Se há uma biblioteca configurada, reescanear
     if CURRENT_LIBRARY_PATH and Path(CURRENT_LIBRARY_PATH).exists():
         try:
-            # Só logar a primeira vez ou quando solicitado explicitamente
             library = scanner.scan_library(CURRENT_LIBRARY_PATH)
             
-            # Converter thumbnails para URLs da API
-            for manga in library.mangas:
-                if manga.thumbnail:
-                    manga.thumbnail = f"/api/image?path={manga.thumbnail}"
-            
-            # Criar resposta otimizada
+            # Criar resposta otimizada COM thumbnails funcionais
             optimized_mangas = []
             for manga in library.mangas:
+                # ✅ CORREÇÃO: Verificar se thumbnail existe antes de criar URL
+                thumbnail_url = None
+                if manga.thumbnail and Path(manga.thumbnail).exists():
+                    try:
+                        encoded_path = urllib.parse.quote(manga.thumbnail, safe=':/')
+                        thumbnail_url = f"/api/image?path={encoded_path}"
+                        print(f"📸 Thumbnail URL criada: {manga.title} -> {thumbnail_url}")
+                    except Exception as e:
+                        print(f"⚠️ Erro ao criar URL thumbnail para {manga.title}: {e}")
+                        thumbnail_url = None
+                else:
+                    print(f"❌ Thumbnail não encontrada para {manga.title}: {manga.thumbnail}")
+                
                 optimized_manga = {
                     "id": manga.id,
                     "title": manga.title,
                     "chapter_count": manga.chapter_count,
                     "total_pages": manga.total_pages,
-                    "thumbnail": f"/api/image?path={urllib.parse.quote(manga.thumbnail, safe=':/')}" if manga.thumbnail else None,
+                    "thumbnail": thumbnail_url,  # ✅ CORRIGIDO: URL ou None
                     "path": manga.path
                 }
                 optimized_mangas.append(optimized_manga)
@@ -332,7 +339,7 @@ async def get_library():
             CURRENT_LIBRARY_PATH = None
             clear_library_path()
     
-    # Se não há biblioteca escaneada, retornar dados mock (só logar na primeira vez)
+    # Mock data (inalterado)
     mock_library = {
         "mangas": [
             {
