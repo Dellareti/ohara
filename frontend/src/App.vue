@@ -11,7 +11,12 @@
         <div class="nav-links">
           <router-link to="/" class="nav-link">📚 Biblioteca</router-link>
           <router-link to="/library-full" class="nav-link">🔧 Versão Completa</router-link>
-          <button @click="testAPI" class="test-btn">🧪 Testar API</button>
+          
+          <!-- Status Indicator -->
+          <div class="connection-status" :class="{ 'connected': isConnected, 'disconnected': !isConnected }">
+            <span class="status-dot"></span>
+            <span class="status-text">{{ isConnected ? 'Online' : 'Offline' }}</span>
+          </div>
         </div>
       </nav>
     </header>
@@ -24,22 +29,8 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>Projeto de Engenharia de Software II - Ohara Manga Reader</p>
-      <div v-if="apiStatus" class="api-status">
-        API Status: <span :class="apiStatus.ok ? 'status-ok' : 'status-error'">
-          {{ apiStatus.message }}
-        </span>
-      </div>
+      <p>Ohara Manga Reader - Preserve suas histórias favoritas</p>
     </footer>
-
-    <!-- API Test Results Modal -->
-    <div v-if="showTestResult" class="test-modal" @click="showTestResult = false">
-      <div class="test-content" @click.stop>
-        <h3>🧪 Resultado do Teste API</h3>
-        <pre>{{ testResult }}</pre>
-        <button @click="showTestResult = false">Fechar</button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -49,40 +40,34 @@ import { ref, onMounted } from 'vue'
 export default {
   name: 'App',
   setup() {
-    const testResult = ref('')
-    const showTestResult = ref(false)
-    const apiStatus = ref(null)
+    const isConnected = ref(false)
     
-    const testAPI = async () => {
+    const checkConnection = async () => {
       try {
-        console.log('🔄 Testando comunicação com API...')
         const response = await fetch('http://localhost:8000/api/test')
-        const data = await response.json()
-        
-        testResult.value = JSON.stringify(data, null, 2)
-        showTestResult.value = true
-        
-        apiStatus.value = { ok: true, message: 'Conectado ✅' }
-        console.log('✅ API funcionando:', data)
+        if (response.ok) {
+          isConnected.value = true
+          console.log('✅ Sistema online')
+        } else {
+          isConnected.value = false
+          console.log('❌ Sistema com erro:', response.status)
+        }
       } catch (error) {
-        testResult.value = `❌ Erro: ${error.message}\n\nVerifique se o backend está rodando em http://localhost:8000`
-        showTestResult.value = true
-        
-        apiStatus.value = { ok: false, message: 'Desconectado ❌' }
-        console.error('❌ Erro na API:', error)
+        isConnected.value = false
+        console.log('❌ Sistema offline:', error.message)
       }
     }
     
     // Verificar API na inicialização
     onMounted(() => {
-      testAPI()
+      checkConnection()
+      
+      // Verificar conexão periodicamente
+      setInterval(checkConnection, 30000)
     })
     
     return { 
-      testResult, 
-      showTestResult, 
-      apiStatus,
-      testAPI 
+      isConnected
     }
   }
 }
@@ -160,19 +145,46 @@ export default {
   border-color: #4ecdc4;
 }
 
-.test-btn {
-  background: linear-gradient(45deg, #4ecdc4, #44a08d);
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  color: white;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: transform 0.2s;
+/* Connection Status */
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
-.test-btn:hover {
-  transform: scale(1.05);
+.connection-status.connected {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4CAF50;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.connection-status.disconnected {
+  background: rgba(244, 67, 54, 0.15);
+  color: #F44336;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+.status-text {
+  font-size: 0.75rem;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 
 /* Main Content */
@@ -194,62 +206,6 @@ export default {
   opacity: 0.8;
 }
 
-.api-status {
-  margin-top: 0.5rem;
-  font-size: 0.8rem;
-}
-
-.status-ok { color: #4ecdc4; }
-.status-error { color: #ff6b6b; }
-
-/* Test Modal */
-.test-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.test-content {
-  background: #2d2d44;
-  padding: 2rem;
-  border-radius: 10px;
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.test-content h3 {
-  color: #4ecdc4;
-  margin-bottom: 1rem;
-}
-
-.test-content pre {
-  background: rgba(0, 0, 0, 0.5);
-  padding: 1rem;
-  border-radius: 5px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-}
-
-.test-content button {
-  background: #4ecdc4;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
-  color: white;
-  cursor: pointer;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   .main-nav {
@@ -264,6 +220,11 @@ export default {
   
   .app-main {
     padding: 1rem;
+  }
+  
+  .connection-status {
+    order: -1;
+    margin-bottom: 0.5rem;
   }
 }
 </style>

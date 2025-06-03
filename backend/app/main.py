@@ -1,6 +1,16 @@
-# backend/app/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.encoders import jsonable_encoder
+from pathlib import Path
+import os
+from typing import Optional
+from datetime import datetime
+import mimetypes
+
+# Imports locais
+from .core.services.manga_scanner import MangaScanner
+from .models.manga import LibraryResponse, MangaResponse
 
 # Criar aplicação FastAPI
 app = FastAPI(
@@ -14,18 +24,76 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+# Instância global do scanner
+scanner = MangaScanner()
+
+# Variável para armazenar o caminho da biblioteca atual
+CURRENT_LIBRARY_PATH: Optional[str] = None
+
+# Arquivo para persistir o caminho da biblioteca
+LIBRARY_PATH_FILE = "last_library_path.txt"
+
+def load_library_path() -> Optional[str]:
+    """Carrega o último caminho de biblioteca usado"""
+    try:
+        if Path(LIBRARY_PATH_FILE).exists():
+            with open(LIBRARY_PATH_FILE, 'r', encoding='utf-8') as f:
+                path = f.read().strip()
+                if path and Path(path).exists():
+                    print(f"📂 Carregado caminho salvo: {path}")
+                    return path
+                else:
+                    print(f"⚠️ Caminho salvo não existe mais: {path}")
+    except Exception as e:
+        print(f"❌ Erro ao carregar caminho salvo: {e}")
+    return None
+
+def save_library_path(path: str):
+    """Salva o caminho da biblioteca para próximas execuções"""
+    try:
+        with open(LIBRARY_PATH_FILE, 'w', encoding='utf-8') as f:
+            f.write(path)
+        print(f"💾 Caminho salvo: {path}")
+    except Exception as e:
+        print(f"❌ Erro ao salvar caminho: {e}")
+
+def clear_library_path():
+    """Remove o arquivo de caminho salvo"""
+    try:
+        if Path(LIBRARY_PATH_FILE).exists():
+            Path(LIBRARY_PATH_FILE).unlink()
+            print(f"🗑️ Arquivo de caminho removido: {LIBRARY_PATH_FILE}")
+    except Exception as e:
+        print(f"❌ Erro ao remover arquivo de caminho: {e}")
+
+# Carregar caminho salvo na inicialização
+CURRENT_LIBRARY_PATH = load_library_path()
 
 @app.get("/")
 async def root():
     return {
         "message": "🏴‍☠️ Ohara - Manga Reader API",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
+        "docs": "/api/docs"
+    }
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy", 
+        "service": "ohara-manga-reader",
+        "message": "API funcionando perfeitamente! 🚀"
     }
 
 @app.get("/api/test")
@@ -33,20 +101,420 @@ async def test_endpoint():
     return {
         "message": "🎉 API Ohara funcionando!",
         "backend": "FastAPI ✅",
-        "status": "OK"
+        "scanner": "MangaScanner ✅",
+        "status": "OK",
+        "tip": "Use /api/scan-library para escanear uma pasta real"
     }
+
+@app.post("/api/clear-library")
+async def clear_library():
+    """
+    Limpa a biblioteca atual no backend
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    try:
+        print("🧹 Limpando biblioteca no backend...")
+        
+        # Limpar variável global
+        CURRENT_LIBRARY_PATH = None
+        
+        # Remover arquivo de cache
+        clear_library_path()
+        
+        print("✅ Biblioteca limpa no backend")
+        
+        return {
+            "message": "Biblioteca limpa com sucesso",
+            "current_path": None,
+            "status": "cleared"
+        }
+        
+    except Exception as e:
+        print(f"❌ Erro ao limpar biblioteca: {str(e)}")
+        return {
+            "message": f"Erro ao limpar biblioteca: {str(e)}",
+            "status": "error"
+        }
+
+@app.post("/api/scan-library")
+async def scan_library_path(library_path: str = Form(...)):
+    """
+    Escaneia uma pasta de biblioteca de mangás
+    
+    Args:
+        library_path: Caminho absoluto para a pasta da biblioteca
+    
+    Returns:
+        LibraryResponse: Biblioteca escaneada com mangás encontrados
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    try:
+        # Limpar e normalizar o caminho
+        library_path = library_path.strip()
+        
+        # Log para debug
+        print(f"📥 Caminho recebido: '{library_path}'")
+        print(f"📏 Comprimento: {len(library_path)} caracteres")
+        print(f"🔤 Encoding: {library_path.encode('utf-8')}")
+        
+        # IMPORTANTE: Limpar biblioteca anterior primeiro
+        if CURRENT_LIBRARY_PATH != library_path:
+            print(f"🔄 Mudando biblioteca de '{CURRENT_LIBRARY_PATH}' para '{library_path}'")
+            CURRENT_LIBRARY_PATH = None
+            clear_library_path()
+        
+        # Validar se o caminho existe - com tratamento melhor de Unicode
+        try:
+            path_obj = Path(library_path)
+            print(f"📁 Path object criado: {path_obj}")
+            print(f"🔍 Absolute path: {path_obj.absolute()}")
+            
+        except Exception as path_error:
+            print(f"❌ Erro ao criar Path object: {path_error}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Caminho inválido (erro de encoding): {library_path}"
+            )
+        
+        if not path_obj.exists():
+            # Tentar variações comuns de encoding
+            alternative_paths = [
+                Path(library_path.encode('utf-8').decode('utf-8')),
+                Path(library_path.encode('latin-1').decode('utf-8', errors='ignore')),
+            ]
+            
+            path_found = False
+            for alt_path in alternative_paths:
+                try:
+                    if alt_path.exists():
+                        path_obj = alt_path
+                        library_path = str(alt_path)
+                        path_found = True
+                        print(f"✅ Caminho encontrado com encoding alternativo: {library_path}")
+                        break
+                except:
+                    continue
+            
+            if not path_found:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Caminho não encontrado: {library_path}"
+                )
+        
+        if not path_obj.is_dir():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Caminho não é um diretório: {library_path}"
+            )
+        
+        # Validar permissões de leitura
+        if not os.access(str(path_obj), os.R_OK):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Sem permissão de leitura: {library_path}"
+            )
+        
+        # Verificar se existem subpastas (indicativo de mangás)
+        subdirs = [d for d in path_obj.iterdir() if d.is_dir()]
+        if len(subdirs) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
+            )
+        
+        print(f"🔍 Escaneando biblioteca: {library_path}")
+        print(f"📂 Subpastas encontradas: {len(subdirs)}")
+        
+        # Escanear biblioteca usando o scanner real
+        library = scanner.scan_library(str(path_obj))
+        
+        # Converter thumbnails para URLs da API
+        for manga in library.mangas:
+            if manga.thumbnail:
+                # Converter caminho absoluto para URL da API
+                # Encoding URL-safe para caminhos com caracteres especiais
+                import urllib.parse
+                encoded_path = urllib.parse.quote(manga.thumbnail, safe='/:')
+                manga.thumbnail = f"/api/image?path={encoded_path}"
+        
+        # Atualizar caminho atual SOMENTE após sucesso
+        CURRENT_LIBRARY_PATH = str(path_obj)
+        
+        # Salvar caminho para próximas execuções
+        save_library_path(str(path_obj))
+        
+        print(f"✅ Biblioteca escaneada: {library.total_mangas} mangás encontrados")
+        
+        # Converter para resposta da API com encoding seguro
+        response_data = {
+            "library": {
+                "mangas": [jsonable_encoder(manga.model_dump()) for manga in library.mangas],
+                "total_mangas": library.total_mangas,
+                "total_chapters": library.total_chapters,
+                "total_pages": library.total_pages,
+                "last_updated": library.last_updated.isoformat()
+            },
+            "message": f"Biblioteca escaneada com sucesso! {library.total_mangas} mangás encontrados.",
+            "scanned_path": str(path_obj),
+            "timestamp": library.last_updated.isoformat()
+        }
+        
+        return JSONResponse(content=jsonable_encoder(response_data))
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erro ao escanear biblioteca: {str(e)}")
+        print(f"📋 Tipo do erro: {type(e).__name__}")
+        import traceback
+        print(f"📄 Traceback completo:\n{traceback.format_exc()}")
+        
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Erro interno do servidor",
+                "message": str(e),
+                "tip": "Verifique se o caminho existe e você tem permissões de leitura. Caracteres especiais podem causar problemas.",
+                "received_path": library_path
+            }
+        )
 
 @app.get("/api/library")
 async def get_library():
-    return {
+    """
+    Retorna a biblioteca atual (escaneada ou dados mock)
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    # Se há uma biblioteca configurada, reescanear
+    if CURRENT_LIBRARY_PATH and Path(CURRENT_LIBRARY_PATH).exists():
+        try:
+            # Só logar a primeira vez ou quando solicitado explicitamente
+            library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+            
+            # Converter thumbnails para URLs da API
+            for manga in library.mangas:
+                if manga.thumbnail:
+                    manga.thumbnail = f"/api/image?path={manga.thumbnail}"
+            
+            response_data = {
+                "mangas": [jsonable_encoder(manga.model_dump()) for manga in library.mangas],
+                "total_mangas": library.total_mangas,
+                "total_chapters": library.total_chapters,
+                "total_pages": library.total_pages,
+                "message": f"Biblioteca com {library.total_mangas} mangás",
+                "scanned_path": CURRENT_LIBRARY_PATH,
+                "last_updated": library.last_updated.isoformat(),
+                "is_mock": False
+            }
+            
+            return JSONResponse(content=jsonable_encoder(response_data))
+            
+        except Exception as e:
+            print(f"❌ Erro ao recarregar biblioteca: {str(e)}")
+            # Se falhar, limpar caminho e usar mock
+            CURRENT_LIBRARY_PATH = None
+            clear_library_path()
+    
+    # Se não há biblioteca escaneada, retornar dados mock (só logar na primeira vez)
+    mock_library = {
         "mangas": [
-            {"id": "one-piece", "title": "One Piece", "chapter_count": 1095},
-            {"id": "naruto", "title": "Naruto", "chapter_count": 700},
-            {"id": "attack-on-titan", "title": "Attack on Titan", "chapter_count": 139}
+            {
+                "id": "one-piece",
+                "title": "One Piece",
+                "chapter_count": 1095,
+                "thumbnail": None,
+                "last_chapter": "Capítulo 1095",
+                "path": "/mock/One Piece"
+            },
+            {
+                "id": "naruto",
+                "title": "Naruto", 
+                "chapter_count": 700,
+                "thumbnail": None,
+                "last_chapter": "Capítulo 700",
+                "path": "/mock/Naruto"
+            },
+            {
+                "id": "attack-on-titan",
+                "title": "Attack on Titan",
+                "chapter_count": 139,
+                "thumbnail": None,
+                "last_chapter": "Capítulo 139",
+                "path": "/mock/Attack on Titan"
+            }
         ],
-        "total_mangas": 3
+        "total_mangas": 3,
+        "message": "📚 Configure uma biblioteca real para começar",
+        "is_mock": True
+    }
+    return JSONResponse(content=mock_library)
+
+@app.get("/api/manga/{manga_id}")
+async def get_manga(manga_id: str):
+    """
+    Retorna detalhes de um mangá específico
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    # Se não há biblioteca escaneada, retornar dados mock
+    if CURRENT_LIBRARY_PATH is None:
+        mock_manga = {
+            "id": manga_id,
+            "title": manga_id.replace("-", " ").title(),
+            "chapters": [
+                {"id": f"{manga_id}-ch-5", "name": "Capítulo 5", "number": 5, "pages": 20},
+                {"id": f"{manga_id}-ch-4", "name": "Capítulo 4", "number": 4, "pages": 18},
+                {"id": f"{manga_id}-ch-3", "name": "Capítulo 3", "number": 3, "pages": 22},
+                {"id": f"{manga_id}-ch-2", "name": "Capítulo 2", "number": 2, "pages": 19},
+                {"id": f"{manga_id}-ch-1", "name": "Capítulo 1", "number": 1, "pages": 25}
+            ],
+            "thumbnail": None,
+            "chapter_count": 5,
+            "message": f"Dados mock para {manga_id} - Escaneie uma biblioteca real",
+            "is_mock": True
+        }
+        return JSONResponse(content=mock_manga)
+    
+    # Buscar mangá real na biblioteca escaneada
+    try:
+        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        manga = library.get_manga(manga_id)
+        
+        if not manga:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Mangá '{manga_id}' não encontrado na biblioteca"
+            )
+        
+        # Converter thumbnails e páginas para URLs da API
+        if manga.thumbnail:
+            manga.thumbnail = f"/api/image?path={manga.thumbnail}"
+        
+        for chapter in manga.chapters:
+            for page in chapter.pages:
+                page.path = f"/api/image?path={page.path}"
+        
+        response_data = {
+            "manga": jsonable_encoder(manga.model_dump()),
+            "message": f"Detalhes do mangá '{manga.title}' carregados",
+            "is_mock": False
+        }
+        
+        return JSONResponse(content=jsonable_encoder(response_data))
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erro ao buscar mangá {manga_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar mangá: {str(e)}"
+        )
+
+@app.get("/api/validate-path")
+async def validate_library_path(path: str):
+    """
+    Valida se um caminho é válido para biblioteca
+    """
+    try:
+        is_valid, message = scanner.validate_library_path(path)
+        
+        return {
+            "valid": is_valid,
+            "message": message,
+            "path": path,
+            "exists": Path(path).exists(),
+            "is_directory": Path(path).is_dir() if Path(path).exists() else False,
+            "readable": os.access(path, os.R_OK) if Path(path).exists() else False
+        }
+        
+    except Exception as e:
+        return {
+            "valid": False,
+            "message": f"Erro ao validar caminho: {str(e)}",
+            "path": path,
+            "exists": False,
+            "is_directory": False,
+            "readable": False
+        }
+
+@app.get("/api/image")
+async def serve_image(path: str):
+    """
+    Serve imagens do sistema de arquivos local
+    
+    Args:
+        path: Caminho completo para a imagem
+        
+    Returns:
+        FileResponse: Arquivo de imagem
+    """
+    try:
+        # Validar se o arquivo existe
+        file_path = Path(path)
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Imagem não encontrada: {path}"
+            )
+        
+        if not file_path.is_file():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Caminho não é um arquivo: {path}"
+            )
+        
+        # Verificar se é uma imagem
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        if not mime_type or not mime_type.startswith('image/'):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Arquivo não é uma imagem válida: {path}"
+            )
+        
+        # Verificar permissões de leitura
+        if not os.access(path, os.R_OK):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Sem permissão de leitura: {path}"
+            )
+        
+        # Servir arquivo
+        return FileResponse(
+            path=str(file_path),
+            media_type=mime_type,
+            filename=file_path.name
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erro ao servir imagem {path}: {str(e)}")
+
+@app.get("/api/debug")
+async def debug_info():
+    """
+    Endpoint de debug para verificar estado do backend
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    return {
+        "current_library_path": CURRENT_LIBRARY_PATH,
+        "path_file_exists": Path(LIBRARY_PATH_FILE).exists(),
+        "path_file_content": Path(LIBRARY_PATH_FILE).read_text() if Path(LIBRARY_PATH_FILE).exists() else None,
+        "path_is_valid": Path(CURRENT_LIBRARY_PATH).exists() if CURRENT_LIBRARY_PATH else False,
+        "message": "Debug info"
     }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )

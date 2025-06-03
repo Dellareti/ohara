@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pathlib import Path
@@ -13,17 +13,8 @@ class Page(BaseModel):
 
 class Chapter(BaseModel):
     """Modelo para um capítulo de mangá"""
-    id: str = Field(..., description="ID único do capítulo")
-    name: str = Field(..., description="Nome do capítulo")
-    number: Optional[float] = Field(None, description="Número do capítulo")
-    volume: Optional[int] = Field(None, description="Número do volume")
-    path: str = Field(..., description="Caminho da pasta do capítulo")
-    pages: List[Page] = Field(default_factory=list, description="Lista de páginas")
-    page_count: int = Field(0, description="Número total de páginas")
-    date_added: datetime = Field(default_factory=datetime.now)
-    
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "one-piece-ch-1001",
                 "name": "Capítulo 1001",
@@ -34,9 +25,35 @@ class Chapter(BaseModel):
                 "pages": []
             }
         }
+    )
+    
+    id: str = Field(..., description="ID único do capítulo")
+    name: str = Field(..., description="Nome do capítulo")
+    number: Optional[float] = Field(None, description="Número do capítulo")
+    volume: Optional[int] = Field(None, description="Número do volume")
+    path: str = Field(..., description="Caminho da pasta do capítulo")
+    pages: List[Page] = Field(default_factory=list, description="Lista de páginas")
+    page_count: int = Field(0, description="Número total de páginas")
+    date_added: datetime = Field(default_factory=datetime.now)
 
 class Manga(BaseModel):
     """Modelo para um mangá"""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "one-piece",
+                "title": "One Piece",
+                "path": "/path/to/manga/One Piece",
+                "thumbnail": "/static/thumbnails/one-piece.jpg",
+                "chapter_count": 1050,
+                "total_pages": 20000,
+                "author": "Eiichiro Oda",
+                "status": "Ongoing",
+                "genres": ["Action", "Adventure", "Shounen"]
+            }
+        }
+    )
+    
     id: str = Field(..., description="ID único do mangá")
     title: str = Field(..., description="Título do mangá")
     path: str = Field(..., description="Caminho da pasta do mangá")
@@ -55,21 +72,6 @@ class Manga(BaseModel):
     # Timestamps
     date_added: datetime = Field(default_factory=datetime.now)
     date_modified: datetime = Field(default_factory=datetime.now)
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": "one-piece",
-                "title": "One Piece",
-                "path": "/path/to/manga/One Piece",
-                "thumbnail": "/static/thumbnails/one-piece.jpg",
-                "chapter_count": 1050,
-                "total_pages": 20000,
-                "author": "Eiichiro Oda",
-                "status": "Ongoing",
-                "genres": ["Action", "Adventure", "Shounen"]
-            }
-        }
 
 class Library(BaseModel):
     """Modelo para a biblioteca de mangás"""
