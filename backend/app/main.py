@@ -7,6 +7,7 @@ import os
 from typing import Optional
 from datetime import datetime
 import mimetypes
+import urllib.parse
 
 # Imports locais
 from .core.services.manga_scanner import MangaScanner
@@ -299,8 +300,21 @@ async def get_library():
                 if manga.thumbnail:
                     manga.thumbnail = f"/api/image?path={manga.thumbnail}"
             
+            # Criar resposta otimizada
+            optimized_mangas = []
+            for manga in library.mangas:
+                optimized_manga = {
+                    "id": manga.id,
+                    "title": manga.title,
+                    "chapter_count": manga.chapter_count,
+                    "total_pages": manga.total_pages,
+                    "thumbnail": f"/api/image?path={urllib.parse.quote(manga.thumbnail, safe=':/')}" if manga.thumbnail else None,
+                    "path": manga.path
+                }
+                optimized_mangas.append(optimized_manga)
+
             response_data = {
-                "mangas": [jsonable_encoder(manga.model_dump()) for manga in library.mangas],
+                "mangas": optimized_mangas,
                 "total_mangas": library.total_mangas,
                 "total_chapters": library.total_chapters,
                 "total_pages": library.total_pages,
@@ -518,3 +532,163 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+# === ENDPOINTS DE CACHE - ADICIONAR AO FINAL DO main.py ===
+
+@app.get("/api/cache/info")
+async def get_cache_info():
+    """
+    Obter informações sobre o cache da biblioteca atual
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    if not CURRENT_LIBRARY_PATH:
+        return {
+            "cache_enabled": True,
+            "current_library": None,
+            "cache_info": {"exists": False}
+        }
+    
+    try:
+        cache_info = scanner.get_cache_info(CURRENT_LIBRARY_PATH)
+        
+        return {
+            "cache_enabled": scanner.cache_enabled,
+            "current_library": CURRENT_LIBRARY_PATH,
+            "cache_info": cache_info,
+            "scanner_version": "Cache Híbrido v1.0"
+        }
+        
+    except Exception as e:
+        return {
+            "cache_enabled": scanner.cache_enabled,
+            "current_library": CURRENT_LIBRARY_PATH,
+            "cache_info": {"exists": False, "error": str(e)},
+            "scanner_version": "Cache Híbrido v1.0"
+        }
+
+@app.post("/api/cache/clear")
+async def clear_cache():
+    """
+    Limpar cache da biblioteca atual
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    if not CURRENT_LIBRARY_PATH:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma biblioteca configurada"
+        )
+    
+    try:
+        success = scanner.clear_cache(CURRENT_LIBRARY_PATH)
+        
+        if success:
+            return {
+                "message": "Cache limpo com sucesso",
+                "library_path": CURRENT_LIBRARY_PATH,
+                "status": "cleared"
+            }
+        else:
+            return {
+                "message": "Nenhum cache encontrado para limpar",
+                "library_path": CURRENT_LIBRARY_PATH,
+                "status": "no_cache"
+            }
+            
+    except Exception as e:
+        print(f"❌ Erro ao limpar cache: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao limpar cache: {str(e)}"
+        )
+
+@app.post("/api/cache/disable")
+async def disable_cache():
+    """
+    Desabilitar cache híbrido (para debug/troubleshooting)
+    """
+    try:
+        scanner.disable_cache()
+        
+        return {
+            "message": "Cache híbrido desabilitado",
+            "cache_enabled": False,
+            "status": "disabled"
+        }
+        
+    except Exception as e:
+        print(f"❌ Erro ao desabilitar cache: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao desabilitar cache: {str(e)}"
+        )
+
+@app.post("/api/cache/enable")
+async def enable_cache():
+    """
+    Reabilitar cache híbrido
+    """
+    try:
+        scanner.enable_cache()
+        
+        return {
+            "message": "Cache híbrido habilitado",
+            "cache_enabled": True,
+            "status": "enabled"
+        }
+        
+    except Exception as e:
+        print(f"❌ Erro ao habilitar cache: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao habilitar cache: {str(e)}"
+        )
+
+@app.get("/api/debug/performance")
+async def debug_performance():
+    """
+    Endpoint de debug para analisar performance do scanner
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    if not CURRENT_LIBRARY_PATH:
+        return {
+            "error": "Nenhuma biblioteca configurada",
+            "current_library": None
+        }
+    
+    try:
+        import time
+        from pathlib import Path
+        
+        library_path = Path(CURRENT_LIBRARY_PATH)
+        
+        # Contar estrutura rapidamente
+        manga_count = len([d for d in library_path.iterdir() if d.is_dir() and not d.name.startswith('.')])
+        
+        # Verificar cache
+        cache_info = scanner.get_cache_info(CURRENT_LIBRARY_PATH)
+        
+        # Estimativas de performance
+        estimated_time_with_cache = 0.1 if cache_info["exists"] else None
+        estimated_time_without_cache = manga_count * 0.3  # ~300ms por mangá
+        
+        return {
+            "library_path": CURRENT_LIBRARY_PATH,
+            "manga_count": manga_count,
+            "cache_info": cache_info,
+            "performance_estimates": {
+                "with_cache_seconds": estimated_time_with_cache,
+                "without_cache_seconds": estimated_time_without_cache,
+                "speedup_factor": round(estimated_time_without_cache / 0.1, 1) if estimated_time_with_cache else None
+            },
+            "cache_enabled": scanner.cache_enabled,
+            "max_workers": scanner.max_workers
+        }
+        
+    except Exception as e:
+        print(f"❌ Erro no debug de performance: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro no debug: {str(e)}"
+        )
