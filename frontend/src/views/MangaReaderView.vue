@@ -1,5 +1,10 @@
+<!-- frontend/src/views/MangaReaderView.vue -->
 <template>
-  <div class="manga-reader" :class="{ 'fullscreen': isFullscreen, 'controls-hidden': hideControls }">
+  <div class="manga-reader" :class="{ 
+    'fullscreen': readerStore.isFullscreen, 
+    'controls-hidden': readerStore.hideControls,
+    [`theme-${readerStore.theme}`]: true
+  }">
     <!-- Loading State -->
     <div v-if="loading" class="reader-loading">
       <div class="spinner"></div>
@@ -14,151 +19,117 @@
     </div>
 
     <!-- Reader Content -->
-    <div v-if="chapter && !loading" class="reader-content">
+    <div v-if="readerStore.currentChapter && !loading" class="reader-content">
       <!-- Header Controls (hideable) -->
-      <div class="reader-header" :class="{ 'hidden': hideControls }">
+      <div class="reader-header" :class="{ 'hidden': readerStore.hideControls }">
         <div class="header-left">
           <button @click="goBack" class="control-btn">
             ← Voltar
           </button>
           <div class="chapter-info">
-            <h3>{{ manga?.title }}</h3>
-            <p>{{ chapter.name }}</p>
+            <h3>{{ readerStore.currentManga?.title }}</h3>
+            <p>{{ readerStore.currentChapter?.chapter?.name }}</p>
           </div>
         </div>
 
         <div class="header-right">
           <div class="page-counter">
-            {{ currentPage + 1 }} / {{ totalPages }}
+            {{ readerStore.currentPage + 1 }} / {{ readerStore.totalPages }}
           </div>
           <button @click="toggleFullscreen" class="control-btn">
-            {{ isFullscreen ? '🗖' : '🗗' }}
+            {{ readerStore.isFullscreen ? '🗖' : '🗗' }}
           </button>
-          <button @click="showSettings = !showSettings" class="control-btn">
+          <button @click="readerStore.toggleSettings" class="control-btn">
             ⚙️
           </button>
         </div>
       </div>
 
-      <!-- Reading Area -->
-      <div class="reading-area" ref="readingArea" @click="handlePageClick">
-        <!-- Single Page Mode -->
-        <div v-if="readingMode === 'single'" class="single-page-container">
-          <img
-            v-if="currentPageData"
-            :src="currentPageData.path"
-            :alt="`Página ${currentPage + 1}`"
-            class="page-image"
-            :style="pageStyle"
-            @load="onImageLoad"
-            @error="onImageError"
-          />
-          
-          <!-- Page Navigation Zones -->
-          <div class="nav-zones">
-            <div class="nav-zone prev" @click.stop="previousPage"></div>
-            <div class="nav-zone next" @click.stop="nextPage"></div>
-          </div>
-        </div>
-
-        <!-- Double Page Mode -->
-        <div v-if="readingMode === 'double'" class="double-page-container">
-          <img
-            v-if="currentPageData"
-            :src="currentPageData.path"
-            :alt="`Página ${currentPage + 1}`"
-            class="page-image left"
-            :style="pageStyle"
-          />
-          <img
-            v-if="nextPageData && currentPage < totalPages - 1"
-            :src="nextPageData.path"
-            :alt="`Página ${currentPage + 2}`"
-            class="page-image right"
-            :style="pageStyle"
-          />
-        </div>
-
-        <!-- Vertical Continuous Mode -->
-        <div v-if="readingMode === 'vertical'" class="vertical-container">
-          <img
-            v-for="(page, index) in visiblePages"
-            :key="page.path"
-            :src="page.path"
-            :alt="`Página ${index + 1}`"
-            class="page-image vertical"
-            :style="pageStyle"
-            @load="onImageLoad"
-            @error="onImageError"
-          />
-        </div>
-
-        <!-- Webtoon Mode -->
-        <div v-if="readingMode === 'webtoon'" class="webtoon-container">
-          <div
-            v-for="(page, index) in visiblePages"
-            :key="page.path"
-            class="webtoon-page"
-          >
-            <img
-              :src="page.path"
-              :alt="`Página ${index + 1}`"
-              class="page-image webtoon"
-              :style="pageStyle"
-            />
-          </div>
-        </div>
-      </div>
+      <!-- Page Viewer Component -->
+      <PageViewer
+        :current-page-data="readerStore.currentPageData"
+        :next-page-data="readerStore.nextPageData"
+        :visible-pages="readerStore.visiblePages"
+        :current-page="readerStore.currentPage"
+        :total-pages="readerStore.totalPages"
+        :reading-mode="readerStore.readingMode"
+        :fit-mode="readerStore.fitMode"
+        :reading-direction="readerStore.readingDirection"
+        :touch-zones="readerStore.touchZones"
+        :theme="readerStore.theme"
+        :is-fullscreen="readerStore.isFullscreen"
+        @next-page="nextPage"
+        @previous-page="previousPage"
+        @toggle-controls="toggleControls"
+        @page-changed="onPageChanged"
+        @zoom-changed="onZoomChanged"
+      />
 
       <!-- Bottom Controls (hideable) -->
-      <div class="reader-footer" :class="{ 'hidden': hideControls }">
+      <div class="reader-footer" :class="{ 'hidden': readerStore.hideControls }">
         <div class="progress-bar">
           <div class="progress-track" @click="seekToPosition">
             <div 
               class="progress-fill" 
-              :style="{ width: progressPercentage + '%' }"
+              :style="{ width: readerStore.progressPercentage + '%' }"
             ></div>
             <div 
               class="progress-thumb" 
-              :style="{ left: progressPercentage + '%' }"
+              :style="{ left: readerStore.progressPercentage + '%' }"
             ></div>
           </div>
         </div>
 
         <div class="footer-controls">
-          <button @click="previousChapter" :disabled="!hasPreviousChapter" class="control-btn">
+          <button 
+            @click="previousChapter" 
+            :disabled="!readerStore.hasPreviousChapter" 
+            class="control-btn"
+          >
             ⏮️ Cap. Anterior
           </button>
           
-          <button @click="previousPage" :disabled="currentPage <= 0" class="control-btn">
+          <button 
+            @click="previousPage" 
+            :disabled="readerStore.currentPage <= 0" 
+            class="control-btn"
+          >
             ⏪ Anterior
           </button>
           
-          <select v-model="readingMode" class="mode-select">
+          <select v-model="readerStore.readingMode" class="mode-select">
             <option value="single">📄 Página Única</option>
             <option value="double">📖 Página Dupla</option>
             <option value="vertical">📜 Vertical</option>
             <option value="webtoon">📱 Webtoon</option>
           </select>
           
-          <button @click="nextPage" :disabled="currentPage >= totalPages - 1" class="control-btn">
+          <button 
+            @click="nextPage" 
+            :disabled="readerStore.currentPage >= readerStore.totalPages - 1" 
+            class="control-btn"
+          >
             Próxima ⏩
           </button>
           
-          <button @click="nextChapter" :disabled="!hasNextChapter" class="control-btn">
+          <button 
+            @click="nextChapter" 
+            :disabled="!readerStore.hasNextChapter" 
+            class="control-btn"
+          >
             Próx. Cap. ⏭️
           </button>
         </div>
       </div>
 
       <!-- Settings Panel -->
-      <div v-if="showSettings" class="settings-panel">
+      <div v-if="readerStore.showSettings" class="settings-panel">
         <div class="settings-content">
           <h3>⚙️ Configurações de Leitura</h3>
           
           <div class="setting-group">
             <label>📏 Ajuste de Imagem:</label>
-            <select v-model="fitMode">
+            <select v-model="readerStore.fitMode">
               <option value="width">Ajustar Largura</option>
               <option value="height">Ajustar Altura</option>
               <option value="screen">Ajustar Tela</option>
@@ -168,7 +139,7 @@
 
           <div class="setting-group">
             <label>📖 Direção de Leitura:</label>
-            <select v-model="readingDirection">
+            <select v-model="readerStore.readingDirection">
               <option value="ltr">Esquerda → Direita</option>
               <option value="rtl">Direita → Esquerda</option>
             </select>
@@ -176,7 +147,7 @@
 
           <div class="setting-group">
             <label>👆 Zonas de Toque:</label>
-            <select v-model="touchZones">
+            <select v-model="readerStore.touchZones">
               <option value="edge">Bordas</option>
               <option value="kindle">Estilo Kindle</option>
               <option value="l-shape">Formato L</option>
@@ -186,7 +157,7 @@
 
           <div class="setting-group">
             <label>🌙 Tema:</label>
-            <select v-model="theme">
+            <select v-model="readerStore.theme">
               <option value="dark">Escuro</option>
               <option value="light">Claro</option>
               <option value="sepia">Sépia</option>
@@ -196,62 +167,31 @@
           <div class="setting-group">
             <label>⏱️ Auto-scroll (segundos):</label>
             <input 
-              v-model.number="autoScrollDelay" 
+              v-model.number="readerStore.autoScrollDelay" 
               type="range" 
               min="0" 
               max="10" 
               step="0.5"
             />
-            <span>{{ autoScrollDelay || 'Desativado' }}</span>
+            <span>{{ readerStore.autoScrollDelay || 'Desativado' }}</span>
           </div>
 
           <div class="setting-actions">
-            <button @click="resetSettings" class="secondary-btn">
+            <button @click="readerStore.resetSettings" class="secondary-btn">
               🔄 Redefinir
             </button>
-            <button @click="showSettings = false" class="primary-btn">
+            <button @click="readerStore.showSettings = false" class="primary-btn">
               ✅ Aplicar
             </button>
           </div>
         </div>
       </div>
-
-      <!-- Keyboard Shortcuts Help -->
-      <div v-if="showHelp" class="help-panel">
-        <div class="help-content">
-          <h3>⌨️ Atalhos do Teclado</h3>
-          <div class="shortcuts">
-            <div class="shortcut-item">
-              <kbd>Space</kbd> / <kbd>→</kbd> - Próxima página
-            </div>
-            <div class="shortcut-item">
-              <kbd>Backspace</kbd> / <kbd>←</kbd> - Página anterior
-            </div>
-            <div class="shortcut-item">
-              <kbd>F</kbd> - Tela cheia
-            </div>
-            <div class="shortcut-item">
-              <kbd>H</kbd> - Mostrar/ocultar controles
-            </div>
-            <div class="shortcut-item">
-              <kbd>S</kbd> - Configurações
-            </div>
-            <div class="shortcut-item">
-              <kbd>Esc</kbd> - Sair da tela cheia
-            </div>
-          </div>
-          <button @click="showHelp = false" class="primary-btn">
-            ✅ Entendi
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- Floating Action Buttons -->
-    <div class="floating-actions" v-if="!hideControls">
-      <button @click="showHelp = true" class="fab help">❓</button>
-      <button @click="toggleAutoScroll" class="fab auto-scroll" :class="{ active: autoScrollActive }">
-        {{ autoScrollActive ? '⏸️' : '▶️' }}
+    <div class="floating-actions" v-if="!readerStore.hideControls">
+      <button @click="toggleAutoScroll" class="fab auto-scroll" :class="{ active: readerStore.autoScrollActive }">
+        {{ readerStore.autoScrollActive ? '⏸️' : '▶️' }}
       </button>
     </div>
   </div>
@@ -261,34 +201,24 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/store/library'
+import { useReaderStore } from '@/store/reader'
+import PageViewer from '@/components/Reader/PageViewer.vue'
 
 export default {
   name: 'MangaReaderView',
+  components: {
+    PageViewer
+  },
   setup() {
     const route = useRoute()
     const router = useRouter()
     const libraryStore = useLibraryStore()
+    const readerStore = useReaderStore()
 
     // Reactive data
-    const manga = ref(null)
-    const chapter = ref(null)
     const loading = ref(true)
     const error = ref(null)
-    const currentPage = ref(0)
-    const isFullscreen = ref(false)
-    const hideControls = ref(false)
-    const showSettings = ref(false)
-    const showHelp = ref(false)
     const readingArea = ref(null)
-
-    // Reading settings
-    const readingMode = ref('single') // single, double, vertical, webtoon
-    const fitMode = ref('width') // width, height, screen, original
-    const readingDirection = ref('rtl') // ltr, rtl
-    const touchZones = ref('edge') // edge, kindle, l-shape, split
-    const theme = ref('dark') // dark, light, sepia
-    const autoScrollDelay = ref(0)
-    const autoScrollActive = ref(false)
 
     // Auto-hide controls
     let controlsTimeout = null
@@ -297,69 +227,6 @@ export default {
     // Computed
     const mangaId = computed(() => route.params.mangaId)
     const chapterId = computed(() => route.params.chapterId)
-    
-    const totalPages = computed(() => chapter.value?.pages?.length || 0)
-    
-    const currentPageData = computed(() => {
-      if (!chapter.value?.pages || currentPage.value < 0) return null
-      return chapter.value.pages[currentPage.value]
-    })
-    
-    const nextPageData = computed(() => {
-      if (!chapter.value?.pages || currentPage.value >= totalPages.value - 1) return null
-      return chapter.value.pages[currentPage.value + 1]
-    })
-    
-    const visiblePages = computed(() => {
-      if (!chapter.value?.pages) return []
-      
-      if (readingMode.value === 'vertical' || readingMode.value === 'webtoon') {
-        // Para modo vertical, mostrar todas as páginas
-        return chapter.value.pages
-      }
-      
-      return [currentPageData.value].filter(Boolean)
-    })
-    
-    const progressPercentage = computed(() => {
-      if (totalPages.value === 0) return 0
-      return (currentPage.value / (totalPages.value - 1)) * 100
-    })
-    
-    const pageStyle = computed(() => {
-      const styles = {}
-      
-      switch (fitMode.value) {
-        case 'width':
-          styles.width = '100%'
-          styles.height = 'auto'
-          break
-        case 'height':
-          styles.height = '100vh'
-          styles.width = 'auto'
-          break
-        case 'screen':
-          styles.maxWidth = '100%'
-          styles.maxHeight = '100vh'
-          styles.objectFit = 'contain'
-          break
-        case 'original':
-          // Tamanho original da imagem
-          break
-      }
-      
-      return styles
-    })
-    
-    const hasPreviousChapter = computed(() => {
-      // TODO: Implementar verificação de capítulo anterior
-      return false
-    })
-    
-    const hasNextChapter = computed(() => {
-      // TODO: Implementar verificação de próximo capítulo
-      return false
-    })
 
     // Methods
     const loadChapter = async () => {
@@ -367,26 +234,8 @@ export default {
       error.value = null
       
       try {
-        // Carregar mangá se não estiver carregado
-        if (!manga.value) {
-          manga.value = await libraryStore.fetchManga(mangaId.value)
-        }
-        
-        // Encontrar capítulo
-        const foundChapter = manga.value.chapters?.find(ch => ch.id === chapterId.value)
-        
-        if (!foundChapter) {
-          throw new Error('Capítulo não encontrado')
-        }
-        
-        chapter.value = foundChapter
-        
-        // Carregar progresso salvo
-        loadReadingProgress()
-        
-        // Pré-carregar próximas páginas
-        preloadPages()
-        
+        await readerStore.loadChapter(mangaId.value, chapterId.value)
+        resetControlsTimer()
       } catch (err) {
         error.value = err.message || 'Erro ao carregar capítulo'
         console.error('Erro ao carregar capítulo:', err)
@@ -395,126 +244,50 @@ export default {
       }
     }
 
-    const loadReadingProgress = () => {
-      const savedProgress = localStorage.getItem(`ohara_progress_${mangaId.value}_${chapterId.value}`)
-      if (savedProgress) {
-        const progress = JSON.parse(savedProgress)
-        currentPage.value = progress.currentPage || 0
-      }
-    }
-
-    const saveReadingProgress = () => {
-      const progress = {
-        currentPage: currentPage.value,
-        totalPages: totalPages.value,
-        timestamp: Date.now(),
-        percentage: progressPercentage.value
-      }
-      
-      localStorage.setItem(`ohara_progress_${mangaId.value}_${chapterId.value}`, JSON.stringify(progress))
-      
-      // Também salvar no progresso geral do mangá
-      const mangaProgress = JSON.parse(localStorage.getItem(`ohara_progress_${mangaId.value}`) || '{}')
-      mangaProgress.currentChapterId = chapterId.value
-      mangaProgress.lastReadAt = new Date().toISOString()
-      localStorage.setItem(`ohara_progress_${mangaId.value}`, JSON.stringify(mangaProgress))
-    }
-
-    const preloadPages = () => {
-      if (!chapter.value?.pages) return
-      
-      // Pré-carregar próximas 5 páginas
-      const startIndex = Math.max(0, currentPage.value)
-      const endIndex = Math.min(totalPages.value, currentPage.value + 5)
-      
-      for (let i = startIndex; i < endIndex; i++) {
-        const img = new Image()
-        img.src = chapter.value.pages[i].path
-      }
-    }
-
     const nextPage = () => {
-      if (currentPage.value < totalPages.value - 1) {
-        currentPage.value++
-        saveReadingProgress()
-        preloadPages()
-        resetControlsTimer()
-      } else {
+      const hasNext = readerStore.nextPage()
+      if (!hasNext) {
         // Final do capítulo - ir para próximo capítulo
         nextChapter()
       }
+      resetControlsTimer()
     }
 
     const previousPage = () => {
-      if (currentPage.value > 0) {
-        currentPage.value--
-        saveReadingProgress()
-        resetControlsTimer()
-      } else {
+      const hasPrev = readerStore.previousPage()
+      if (!hasPrev) {
         // Início do capítulo - ir para capítulo anterior
         previousChapter()
       }
+      resetControlsTimer()
     }
 
     const nextChapter = () => {
-      // TODO: Implementar navegação para próximo capítulo
-      console.log('Próximo capítulo')
+      if (readerStore.navigation.nextChapter) {
+        router.push({
+          name: 'MangaReader',
+          params: {
+            mangaId: mangaId.value,
+            chapterId: readerStore.navigation.nextChapter.id
+          }
+        })
+      }
     }
 
     const previousChapter = () => {
-      // TODO: Implementar navegação para capítulo anterior
-      console.log('Capítulo anterior')
-    }
-
-    const handlePageClick = (event) => {
-      if (showSettings.value || showHelp.value) return
-      
-      const rect = readingArea.value.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const width = rect.width
-      
-      // Determinar zona de clique baseada nas configurações
-      let clickZone = 'next' // default
-      
-      switch (touchZones.value) {
-        case 'edge':
-          clickZone = x < width * 0.2 ? 'prev' : x > width * 0.8 ? 'next' : 'menu'
-          break
-        case 'kindle':
-          clickZone = x < width * 0.3 ? 'prev' : x > width * 0.7 ? 'next' : 'menu'
-          break
-        case 'l-shape':
-          clickZone = x < width * 0.5 ? 'prev' : 'next'
-          break
-        case 'split':
-          clickZone = x < width * 0.5 ? 'prev' : 'next'
-          break
-      }
-      
-      // Executar ação
-      switch (clickZone) {
-        case 'prev':
-          if (readingDirection.value === 'rtl') {
-            nextPage()
-          } else {
-            previousPage()
+      if (readerStore.navigation.previousChapter) {
+        router.push({
+          name: 'MangaReader',
+          params: {
+            mangaId: mangaId.value,
+            chapterId: readerStore.navigation.previousChapter.id
           }
-          break
-        case 'next':
-          if (readingDirection.value === 'rtl') {
-            previousPage()
-          } else {
-            nextPage()
-          }
-          break
-        case 'menu':
-          toggleControls()
-          break
+        })
       }
     }
 
     const toggleControls = () => {
-      hideControls.value = !hideControls.value
+      readerStore.toggleControls()
       resetControlsTimer()
     }
 
@@ -523,9 +296,9 @@ export default {
         clearTimeout(controlsTimeout)
       }
       
-      if (!hideControls.value) {
+      if (!readerStore.hideControls) {
         controlsTimeout = setTimeout(() => {
-          hideControls.value = true
+          readerStore.hideControls = true
         }, 3000) // Esconder após 3 segundos
       }
     }
@@ -533,15 +306,15 @@ export default {
     const toggleFullscreen = async () => {
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen()
-        isFullscreen.value = true
+        readerStore.isFullscreen = true
       } else {
         await document.exitFullscreen()
-        isFullscreen.value = false
+        readerStore.isFullscreen = false
       }
     }
 
     const toggleAutoScroll = () => {
-      if (autoScrollActive.value) {
+      if (readerStore.autoScrollActive) {
         stopAutoScroll()
       } else {
         startAutoScroll()
@@ -549,16 +322,16 @@ export default {
     }
 
     const startAutoScroll = () => {
-      if (autoScrollDelay.value <= 0) return
+      if (readerStore.autoScrollDelay <= 0) return
       
-      autoScrollActive.value = true
+      readerStore.autoScrollActive = true
       autoScrollInterval = setInterval(() => {
         nextPage()
-      }, autoScrollDelay.value * 1000)
+      }, readerStore.autoScrollDelay * 1000)
     }
 
     const stopAutoScroll = () => {
-      autoScrollActive.value = false
+      readerStore.autoScrollActive = false
       if (autoScrollInterval) {
         clearInterval(autoScrollInterval)
         autoScrollInterval = null
@@ -568,37 +341,30 @@ export default {
     const seekToPosition = (event) => {
       const rect = event.target.getBoundingClientRect()
       const x = event.clientX - rect.left
-      const percentage = x / rect.width
-      const targetPage = Math.floor(percentage * totalPages.value)
+      const percentage = (x / rect.width) * 100
       
-      currentPage.value = Math.max(0, Math.min(totalPages.value - 1, targetPage))
-      saveReadingProgress()
-    }
-
-    const resetSettings = () => {
-      readingMode.value = 'single'
-      fitMode.value = 'width'
-      readingDirection.value = 'rtl'
-      touchZones.value = 'edge'
-      theme.value = 'dark'
-      autoScrollDelay.value = 0
+      readerStore.seekToProgress(percentage)
+      resetControlsTimer()
     }
 
     const goBack = () => {
-      router.back()
+      router.push({
+        name: 'MangaDetail',
+        params: { id: mangaId.value }
+      })
     }
 
-    const onImageLoad = () => {
-      // Imagem carregada com sucesso
+    const onPageChanged = (pageIndex) => {
+      readerStore.currentPage = pageIndex
     }
 
-    const onImageError = () => {
-      console.error('Erro ao carregar imagem da página')
+    const onZoomChanged = (zoomLevel) => {
+      console.log('🔍 Zoom alterado:', zoomLevel)
     }
 
     // Keyboard shortcuts
     const handleKeydown = (event) => {
-      if (showSettings.value || showHelp.value) return
+      if (readerStore.showSettings) return
       
       switch (event.key) {
         case ' ':
@@ -624,16 +390,14 @@ export default {
         case 's':
         case 'S':
           event.preventDefault()
-          showSettings.value = !showSettings.value
+          readerStore.toggleSettings()
           break
         case 'Escape':
           event.preventDefault()
-          if (isFullscreen.value) {
+          if (readerStore.isFullscreen) {
             toggleFullscreen()
-          } else if (showSettings.value) {
-            showSettings.value = false
-          } else if (showHelp.value) {
-            showHelp.value = false
+          } else if (readerStore.showSettings) {
+            readerStore.showSettings = false
           }
           break
       }
@@ -641,13 +405,19 @@ export default {
 
     // Lifecycle
     onMounted(() => {
+      // Carregar configurações do leitor
+      readerStore.loadSettings()
+      
+      // Carregar capítulo
       loadChapter()
+      
+      // Adicionar listeners
       document.addEventListener('keydown', handleKeydown)
       resetControlsTimer()
       
       // Detectar mudanças de fullscreen
       document.addEventListener('fullscreenchange', () => {
-        isFullscreen.value = !!document.fullscreenElement
+        readerStore.isFullscreen = !!document.fullscreenElement
       })
     })
 
@@ -657,6 +427,9 @@ export default {
         clearTimeout(controlsTimeout)
       }
       stopAutoScroll()
+      
+      // Limpar store do leitor
+      readerStore.clearReader()
     })
 
     // Watch route changes
@@ -666,51 +439,26 @@ export default {
       }
     })
 
-    // Watch current page changes
-    watch(currentPage, () => {
-      saveReadingProgress()
-    })
-
     return {
-      manga,
-      chapter,
+      // Store states
+      readerStore,
       loading,
       error,
-      currentPage,
-      totalPages,
-      isFullscreen,
-      hideControls,
-      showSettings,
-      showHelp,
       readingArea,
-      readingMode,
-      fitMode,
-      readingDirection,
-      touchZones,
-      theme,
-      autoScrollDelay,
-      autoScrollActive,
-      currentPageData,
-      nextPageData,
-      visiblePages,
-      progressPercentage,
-      pageStyle,
-      hasPreviousChapter,
-      hasNextChapter,
+      
+      // Methods
       loadChapter,
       nextPage,
       previousPage,
       nextChapter,
       previousChapter,
-      handlePageClick,
       toggleControls,
       toggleFullscreen,
       toggleAutoScroll,
       seekToPosition,
-      resetSettings,
       goBack,
-      onImageLoad,
-      onImageError
+      onPageChanged,
+      onZoomChanged
     }
   }
 }
@@ -830,97 +578,6 @@ export default {
 .control-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-/* Reading Area */
-.reading-area {
-  position: relative;
-  width: 100%;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.single-page-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.double-page-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  width: 100%;
-  height: 100%;
-}
-
-.vertical-container {
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-.webtoon-container {
-  width: 100%;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.page-image {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  transition: transform 0.2s ease;
-}
-
-.page-image.vertical {
-  width: 100%;
-  height: auto;
-  margin-bottom: 1rem;
-}
-
-.page-image.webtoon {
-  width: 100%;
-  height: auto;
-}
-
-.webtoon-page {
-  margin-bottom: 2rem;
-}
-
-/* Navigation Zones */
-.nav-zones {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  pointer-events: none;
-}
-
-.nav-zone {
-  flex: 1;
-  pointer-events: all;
-  cursor: pointer;
-}
-
-.nav-zone.prev {
-  background: linear-gradient(to right, rgba(255,255,255,0.1), transparent);
-}
-
-.nav-zone.next {
-  background: linear-gradient(to left, rgba(255,255,255,0.1), transparent);
 }
 
 /* Footer Controls */
@@ -1054,46 +711,6 @@ export default {
   color: white;
 }
 
-/* Help Panel */
-.help-panel {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
-  padding: 2rem;
-  z-index: 200;
-  max-width: 400px;
-  width: 90%;
-}
-
-.help-content h3 {
-  color: #4ecdc4;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-.shortcuts {
-  margin-bottom: 2rem;
-}
-
-.shortcut-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-kbd {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 0.25rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.8rem;
-}
-
 /* Floating Actions */
 .floating-actions {
   position: fixed;
@@ -1129,6 +746,17 @@ kbd {
   background: #4ecdc4;
 }
 
+/* Theme variations */
+.manga-reader.theme-light {
+  background: #fff;
+  color: #000;
+}
+
+.manga-reader.theme-sepia {
+  background: #f4e5d3;
+  color: #5d4037;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .reader-header, .reader-footer {
@@ -1151,16 +779,5 @@ kbd {
     bottom: 1rem;
     right: 1rem;
   }
-}
-
-/* Theme Variations */
-.manga-reader.theme-light {
-  background: #fff;
-  color: #000;
-}
-
-.manga-reader.theme-sepia {
-  background: #f4e5d3;
-  color: #5d4037;
 }
 </style>

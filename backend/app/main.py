@@ -9,6 +9,7 @@ from datetime import datetime
 import mimetypes
 import urllib.parse
 from app.core.services.manga_scanner import MangaScanner
+from app.api.endpoints.reader import router as reader_router
 
 # Imports locais
 from .core.services.manga_scanner import MangaScanner
@@ -81,6 +82,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+app.include_router(reader_router, prefix="/api", tags=["reader"])
 
 # Instância global do scanner
 scanner = MangaScanner()
@@ -930,3 +933,135 @@ async def debug_thumbnails():
         
     except Exception as e:
         return {"error": str(e)}
+    
+@app.get("/api/manga/{manga_id}")
+async def get_manga_detail(manga_id: str):
+    """
+    Retorna detalhes completos de um mangá para a página de detalhes
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    if not CURRENT_LIBRARY_PATH:
+        # Retornar dados mock se não há biblioteca configurada
+        mock_manga = {
+            "id": manga_id,
+            "title": manga_id.replace("-", " ").title(),
+            "path": f"/mock/{manga_id}",
+            "thumbnail": None,
+            "chapter_count": 5,
+            "total_pages": 100,
+            "author": "Autor Exemplo",
+            "status": "Ongoing",
+            "genres": ["Action", "Adventure"],
+            "description": f"Descrição mock para {manga_id}",
+            "chapters": [
+                {
+                    "id": f"{manga_id}-ch-{i}",
+                    "name": f"Capítulo {i}",
+                    "number": i,
+                    "page_count": 20,
+                    "date_added": "2024-01-01T00:00:00",
+                    "thumbnail_url": None
+                }
+                for i in range(5, 0, -1)  # Capítulos em ordem decrescente
+            ],
+            "is_mock": True
+        }
+        
+        return JSONResponse(content={
+            "manga": mock_manga,
+            "message": "Dados mock - Configure uma biblioteca real",
+            "is_mock": True
+        })
+    
+    try:
+        # Escanear biblioteca real
+        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        manga = library.get_manga(manga_id)
+        
+        if not manga:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Mangá '{manga_id}' não encontrado"
+            )
+        
+        # Preparar dados do mangá
+        manga_data = manga.model_dump()
+        
+        # Converter thumbnail para URL
+        if manga_data.get('thumbnail'):
+            manga_data['thumbnail'] = create_image_url(manga_data['thumbnail'])
+        
+        # Preparar capítulos com thumbnails
+        chapters_with_thumbnails = []
+        for chapter in manga_data['chapters']:
+            chapter_summary = {
+                "id": chapter['id'],
+                "name": chapter['name'],
+                "number": chapter.get('number'),
+                "volume": chapter.get('volume'),
+                "page_count": chapter['page_count'],
+                "date_added": chapter.get('date_added'),
+                "thumbnail_url": None
+            }
+            
+            # Adicionar thumbnail da primeira página
+            if chapter['pages']:
+                first_page_path = chapter['pages'][0]['path']
+                chapter_summary['thumbnail_url'] = create_image_url(first_page_path)
+            
+            chapters_with_thumbnails.append(chapter_summary)
+        
+        manga_data['chapters'] = chapters_with_thumbnails
+        
+        return JSONResponse(content={
+            "manga": manga_data,
+            "message": f"Detalhes do mangá '{manga.title}' carregados",
+            "is_mock": False
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erro ao buscar mangá {manga_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar mangá: {str(e)}"
+        )
+
+@app.get("/api/debug/reader")
+async def debug_reader_info():
+    """
+    Endpoint de debug para o sistema de leitura
+    """
+    global CURRENT_LIBRARY_PATH
+    
+    debug_info = {
+        "library_configured": CURRENT_LIBRARY_PATH is not None,
+        "library_path": CURRENT_LIBRARY_PATH,
+        "cache_entries": len(_chapter_cache) if '_chapter_cache' in globals() else 0,
+        "progress_file_exists": Path("reading_progress.json").exists(),
+        "available_endpoints": [
+            "/api/manga/{manga_id}",
+            "/api/manga/{manga_id}/chapters",
+            "/api/manga/{manga_id}/chapter/{chapter_id}",
+            "/api/progress/{manga_id}",
+            "/api/progress/{manga_id}/{chapter_id}",
+            "POST /api/progress/{manga_id}/{chapter_id}"
+        ]
+    }
+    
+    # Verificar se há dados de progresso
+    if Path("reading_progress.json").exists():
+        try:
+            with open("reading_progress.json", 'r') as f:
+                progress_data = json.load(f)
+                debug_info["progress_mangas"] = list(progress_data.keys())
+                debug_info["total_progress_entries"] = sum(
+                    len([k for k in v.keys() if not k.startswith('_')]) 
+                    for v in progress_data.values()
+                )
+        except Exception as e:
+            debug_info["progress_error"] = str(e)
+    
+    return debug_info
