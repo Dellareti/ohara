@@ -8,10 +8,57 @@ from typing import Optional
 from datetime import datetime
 import mimetypes
 import urllib.parse
+from app.core.services.manga_scanner import MangaScanner
 
 # Imports locais
 from .core.services.manga_scanner import MangaScanner
 from .models.manga import LibraryResponse, MangaResponse
+
+def create_image_url(file_path: str) -> str:
+    """
+    Cria URL limpa para servir imagens, evitando duplicação
+    
+    Args:
+        file_path: Caminho absoluto do arquivo
+        
+    Returns:
+        str: URL da API para servir a imagem ou None
+    """
+    if not file_path:
+        return None
+    
+    if file_path.startswith('/api/image') or file_path.startswith('http'):
+        print(f"⚠️ URL já processada detectada: {file_path[:50]}...")
+        return None
+    
+    try:
+        file_obj = Path(file_path)
+        if not file_obj.exists() or not file_obj.is_file():
+            print(f"⚠️ Arquivo não existe: {file_path}")
+            return None
+            
+        # Verificar se é imagem
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(str(file_obj))
+        if not mime_type or not mime_type.startswith('image/'):
+            print(f"⚠️ Não é imagem: {file_path} (MIME: {mime_type})")
+            return None
+            
+    except Exception as e:
+        print(f"⚠️ Erro ao validar arquivo {file_path}: {e}")
+        return None
+    
+    # Converter caminho absoluto para URL da API
+    try:
+        import urllib.parse
+        # Encoding completo para evitar problemas
+        encoded_path = urllib.parse.quote(file_path, safe='')
+        clean_url = f"/api/image?path={encoded_path}"
+        print(f"✅ URL criada: {file_obj.name} -> URL válida")
+        return clean_url
+    except Exception as e:
+        print(f"❌ Erro ao criar URL para {file_path}: {e}")
+        return None
 
 # Criar aplicação FastAPI
 app = FastAPI(
@@ -234,11 +281,7 @@ async def scan_library_path(library_path: str = Form(...)):
         # Converter thumbnails para URLs da API
         for manga in library.mangas:
             if manga.thumbnail:
-                # Converter caminho absoluto para URL da API
-                # Encoding URL-safe para caminhos com caracteres especiais
-                import urllib.parse
-                encoded_path = urllib.parse.quote(manga.thumbnail, safe='/:')
-                manga.thumbnail = f"/api/image?path={encoded_path}"
+                print(f"✅ Mantendo thumbnails como caminhos absolutos")
         
         # Atualizar caminho atual SOMENTE após sucesso
         CURRENT_LIBRARY_PATH = str(path_obj)
@@ -282,6 +325,116 @@ async def scan_library_path(library_path: str = Form(...)):
             }
         )
 
+@app.get("/api/scan-library")
+async def scan_library_get(path: str):
+    """
+    Endpoint GET para escanear biblioteca (compatibilidade com frontend)
+    Redireciona para a implementação POST principal
+    """
+    try:
+        # Chama a função principal usando FormData internamente
+        from fastapi import Form
+        
+        # Simular FormData para reutilizar a lógica existente
+        library_path = path
+        
+        # Reutilizar toda a lógica do POST
+        global CURRENT_LIBRARY_PATH
+        
+        # Limpar e normalizar o caminho
+        library_path = library_path.strip()
+        
+        # Log para debug
+        print(f"📥 [GET] Caminho recebido: '{library_path}'")
+        
+        # IMPORTANTE: Limpar biblioteca anterior primeiro
+        if CURRENT_LIBRARY_PATH != library_path:
+            print(f"🔄 [GET] Mudando biblioteca de '{CURRENT_LIBRARY_PATH}' para '{library_path}'")
+            CURRENT_LIBRARY_PATH = None
+            clear_library_path()
+        
+        # Validar se o caminho existe
+        path_obj = Path(library_path)
+        print(f"📁 [GET] Path object criado: {path_obj}")
+        
+        if not path_obj.exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Caminho não encontrado: {library_path}"
+            )
+        
+        if not path_obj.is_dir():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Caminho não é um diretório: {library_path}"
+            )
+        
+        # Validar permissões de leitura
+        if not os.access(str(path_obj), os.R_OK):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Sem permissão de leitura: {library_path}"
+            )
+        
+        # Verificar se existem subpastas (indicativo de mangás)
+        subdirs = [d for d in path_obj.iterdir() if d.is_dir()]
+        if len(subdirs) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
+            )
+        
+        print(f"🔍 [GET] Escaneando biblioteca: {library_path}")
+        print(f"📂 [GET] Subpastas encontradas: {len(subdirs)}")
+        
+        # Escanear biblioteca usando o scanner real
+        library = scanner.scan_library(str(path_obj))
+        
+        # Converter thumbnails para URLs da API
+        for manga in library.mangas:
+            if manga.thumbnail:
+                print(f"✅ Mantendo thumbnails como caminhos absolutos")
+
+        
+        # Atualizar caminho atual SOMENTE após sucesso
+        CURRENT_LIBRARY_PATH = str(path_obj)
+        
+        # Salvar caminho para próximas execuções
+        save_library_path(str(path_obj))
+        
+        print(f"✅ [GET] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
+        
+        # Converter para resposta da API
+        response_data = {
+            "library": {
+                "mangas": [jsonable_encoder(manga.model_dump()) for manga in library.mangas],
+                "total_mangas": library.total_mangas,
+                "total_chapters": library.total_chapters,
+                "total_pages": library.total_pages,
+                "last_updated": library.last_updated.isoformat()
+            },
+            "message": f"Biblioteca escaneada com sucesso! {library.total_mangas} mangás encontrados.",
+            "scanned_path": str(path_obj),
+            "timestamp": library.last_updated.isoformat(),
+            "method": "GET"
+        }
+        
+        return JSONResponse(content=jsonable_encoder(response_data))
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [GET] Erro ao escanear biblioteca: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Erro interno do servidor",
+                "message": str(e),
+                "received_path": path,
+                "method": "GET"
+            }
+        )
+
 @app.get("/api/library")
 async def get_library():
     """
@@ -299,14 +452,12 @@ async def get_library():
             for manga in library.mangas:
                 # ✅ CORREÇÃO: Verificar se thumbnail existe antes de criar URL
                 thumbnail_url = None
-                if manga.thumbnail and Path(manga.thumbnail).exists():
-                    try:
-                        encoded_path = urllib.parse.quote(manga.thumbnail, safe=':/')
-                        thumbnail_url = f"/api/image?path={encoded_path}"
-                        print(f"📸 Thumbnail URL criada: {manga.title} -> {thumbnail_url}")
-                    except Exception as e:
-                        print(f"⚠️ Erro ao criar URL thumbnail para {manga.title}: {e}")
-                        thumbnail_url = None
+                if manga.thumbnail:
+                    thumbnail_url = create_image_url(manga.thumbnail)
+                    if thumbnail_url:
+                        print(f"📸 Thumbnail URL criada: {manga.title}")
+                    else:
+                        print(f"⚠️ Thumbnail inválida para {manga.title}: {manga.thumbnail}")
                 else:
                     print(f"❌ Thumbnail não encontrada para {manga.title}: {manga.thumbnail}")
                 
@@ -461,59 +612,31 @@ async def validate_library_path(path: str):
             "is_directory": False,
             "readable": False
         }
-
+    
 @app.get("/api/image")
 async def serve_image(path: str):
-    """
-    Serve imagens do sistema de arquivos local
-    
-    Args:
-        path: Caminho completo para a imagem
-        
-    Returns:
-        FileResponse: Arquivo de imagem
-    """
+    """Serve imagens - versão simplificada"""
     try:
-        # Validar se o arquivo existe
-        file_path = Path(path)
+        print(f"🖼️ [IMAGE] Path recebido: {path}")
+        
+        # Decodificar URL
+        import urllib.parse
+        decoded_path = urllib.parse.unquote(path)
+        print(f"🖼️ [IMAGE] Path decodificado: {decoded_path}")
+        
+        # Servir arquivo diretamente
+        file_path = Path(decoded_path)
+        
         if not file_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Imagem não encontrada: {path}"
-            )
+            print(f"❌ Arquivo não encontrado: {decoded_path}")
+            raise HTTPException(status_code=404, detail="Arquivo não encontrado")
         
-        if not file_path.is_file():
-            raise HTTPException(
-                status_code=400,
-                detail=f"Caminho não é um arquivo: {path}"
-            )
+        print(f"✅ Servindo: {file_path.name}")
+        return FileResponse(path=str(file_path))
         
-        # Verificar se é uma imagem
-        mime_type, _ = mimetypes.guess_type(str(file_path))
-        if not mime_type or not mime_type.startswith('image/'):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Arquivo não é uma imagem válida: {path}"
-            )
-        
-        # Verificar permissões de leitura
-        if not os.access(path, os.R_OK):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Sem permissão de leitura: {path}"
-            )
-        
-        # Servir arquivo
-        return FileResponse(
-            path=str(file_path),
-            media_type=mime_type,
-            filename=file_path.name
-        )
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"❌ Erro ao servir imagem {path}: {str(e)}")
+        print(f"❌ Erro: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/debug")
 async def debug_info():
@@ -699,3 +822,111 @@ async def debug_performance():
             status_code=500,
             detail=f"Erro no debug: {str(e)}"
         )
+    
+@app.get("/api/preview-library")
+async def preview_library(path: str):
+    """Preview dos mangás que seriam encontrados no caminho"""
+    try:
+        # Validar primeiro
+        is_valid, message = scanner.validate_library_path(path)
+        
+        if not is_valid:
+            return {
+                "valid": False,
+                "message": message,
+                "mangas": []
+            }
+        
+        # Buscar diretórios que parecem mangás
+        library_path = Path(path)
+        potential_mangas = []
+        
+        for item in library_path.iterdir():
+            if item.is_dir() and not item.name.startswith('.'):
+                # Verificar se tem subpastas (capítulos) ou imagens
+                has_chapters = any(sub.is_dir() for sub in item.iterdir() if not sub.name.startswith('.'))
+                has_images = any(
+                    sub.is_file() and sub.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+                    for sub in item.iterdir()
+                )
+                
+                if has_chapters or has_images:
+                    potential_mangas.append({
+                        "name": item.name,
+                        "title": item.name,
+                        "path": str(item),
+                        "has_chapters": has_chapters,
+                        "has_images": has_images
+                    })
+        
+        return {
+            "valid": True,
+            "message": f"Encontrados {len(potential_mangas)} mangás",
+            "mangas": potential_mangas[:20],  # Limitar a 20 para preview
+            "total_found": len(potential_mangas)
+        }
+        
+    except Exception as e:
+        return {
+            "valid": False,
+            "message": f"Erro ao fazer preview: {str(e)}",
+            "mangas": []
+        }
+
+@app.post("/api/set-library-path")
+async def set_library_path(data: dict):
+    """Define o caminho da biblioteca"""
+    try:
+        path = data.get("path")
+        if not path:
+            return {"success": False, "message": "Caminho não fornecido"}
+        
+        # Validar caminho
+        is_valid, message = scanner.validate_library_path(path)
+        if not is_valid:
+            return {"success": False, "message": message}
+        
+        # Aqui você salvaria a configuração (arquivo, banco, etc.)
+        # Por enquanto, vamos apenas validar
+        return {
+            "success": True,
+            "message": "Biblioteca configurada com sucesso",
+            "path": path
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Erro ao configurar biblioteca: {str(e)}"
+        }
+    
+@app.get("/api/debug/thumbnails")
+async def debug_thumbnails():
+    """Debug das thumbnails da biblioteca atual"""
+    global CURRENT_LIBRARY_PATH
+    
+    if not CURRENT_LIBRARY_PATH:
+        return {"error": "Nenhuma biblioteca configurada"}
+    
+    try:
+        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        
+        debug_info = []
+        for manga in library.mangas:
+            thumbnail_info = {
+                "manga": manga.title,
+                "original_thumbnail": manga.thumbnail,
+                "file_exists": Path(manga.thumbnail).exists() if manga.thumbnail else False,
+                "is_file": Path(manga.thumbnail).is_file() if manga.thumbnail and Path(manga.thumbnail).exists() else False,
+                "clean_url": create_image_url(manga.thumbnail) if manga.thumbnail else None
+            }
+            debug_info.append(thumbnail_info)
+        
+        return {
+            "library_path": CURRENT_LIBRARY_PATH,
+            "total_mangas": len(debug_info),
+            "thumbnails": debug_info
+        }
+        
+    except Exception as e:
+        return {"error": str(e)}
