@@ -4,13 +4,17 @@
     <header class="app-header">
       <nav class="main-nav">
         <div class="nav-brand">
-          <h1>🏴‍☠️ Ohara</h1>
+          <router-link to="/library" class="brand-link">
+            <h1>🏴‍☠️ Ohara</h1>
+          </router-link>
           <span class="version">v1.0.0</span>
         </div>
         
         <div class="nav-links">
-          <router-link to="/" class="nav-link">📚 Biblioteca</router-link>
-          <router-link to="/library-full" class="nav-link">🔧 Versão Completa</router-link>
+          <router-link to="/" class="nav-link">Biblioteca</router-link>
+          <router-link to="/library-full" class="nav-link">Versão Completa</router-link>
+          <router-link to="/setup" class="nav-link">Setup</router-link>
+          <router-link to="/settings" class="nav-link">Configurações</router-link>
           
           <!-- Status Indicator -->
           <div class="connection-status" :class="{ 'connected': isConnected, 'disconnected': !isConnected }">
@@ -106,18 +110,32 @@ export default {
   margin: 0 auto;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-link {
+  text-decoration: none;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.brand-link:hover {
+  opacity: 0.8;
+}
+
 .nav-brand h1 {
   font-size: 1.8rem;
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: inline;
+  color: white;
+  margin: 0;
 }
 
 .version {
   font-size: 0.8rem;
   opacity: 0.6;
-  margin-left: 0.5rem;
 }
 
 .nav-links {
@@ -133,6 +151,7 @@ export default {
   border-radius: 20px;
   transition: all 0.3s;
   border: 1px solid transparent;
+  font-weight: 500;
 }
 
 .nav-link:hover {
@@ -190,7 +209,7 @@ export default {
 /* Main Content */
 .app-main {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   width: 100%;
   padding: 2rem;

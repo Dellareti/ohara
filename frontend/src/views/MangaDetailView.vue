@@ -646,7 +646,7 @@ export default {
 .manga-info h1 {
   font-size: 2.5rem;
   margin-bottom: 1rem;
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  background: #fff;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

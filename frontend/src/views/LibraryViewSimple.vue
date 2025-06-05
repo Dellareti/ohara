@@ -2,15 +2,16 @@
   <div class="library-simple">
     <!-- Header com navegação -->
     <div class="header">
-      <h1>🏴‍☠️ Ohara - Biblioteca</h1>
+      <h1>Biblioteca</h1>
       <div class="header-actions">
-        <router-link to="/setup" class="setup-btn">⚙️ Configuração</router-link>
+        <router-link to="/setup" class="setup-btn">Configuração</router-link>
         <button @click="refreshLibrary" class="refresh-btn">🔄 Atualizar</button>
       </div>
     </div>
     
+    <!-- Descomentar ou excluir depois -->
     <!-- Stats da biblioteca -->
-    <div v-if="libraryStore.mangas.length > 0" class="library-stats">
+    <!-- <div v-if="libraryStore.mangas.length > 0" class="library-stats">
       <div class="stat-card">
         <div class="stat-number">{{ libraryStore.totalMangas }}</div>
         <div class="stat-label">Mangás</div>
@@ -23,7 +24,7 @@
         <div class="stat-number">{{ formatPages(totalPages) }}</div>
         <div class="stat-label">Páginas</div>
       </div>
-    </div>
+    </div> -->
 
     <!-- Loading -->
     <div v-if="libraryStore.loading" class="loading-section">
@@ -81,23 +82,7 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Seção de teste (temporária) -->
-    <div class="test-section">
-      <details>
-        <summary>🧪 Testes de Desenvolvimento</summary>
-        <div class="test-content">
-          <button @click="testBackend" class="test-btn">🧪 Testar Backend</button>
-          <button @click="loadMockData" class="test-btn">📚 Carregar Dados Mock</button>
-          
-          <div v-if="testResult" class="result">
-            <h4>Resultado:</h4>
-            <pre>{{ testResult }}</pre>
-          </div>
-        </div>
-      </details>
-    </div>
+    </div>  
   </div>
 </template>
 
@@ -246,7 +231,7 @@ export default {
 .header h1 {
   font-size: 2.5rem;
   margin: 0;
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  background: #fff;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -302,7 +287,7 @@ export default {
 .stat-number {
   font-size: 2rem;
   font-weight: bold;
-  color: #4ecdc4;
+  color: #fff;
 }
 
 .stat-label {
@@ -426,7 +411,7 @@ export default {
 
 .manga-info h3 {
   margin: 0 0 10px 0;
-  color: #4ecdc4;
+  color: #fff;
   font-size: 1.3rem;
   line-height: 1.3;
 }
@@ -440,7 +425,7 @@ export default {
 
 .chapter-count {
   font-weight: bold;
-  color: #ff6b6b;
+  color: #fff;
 }
 
 .author {

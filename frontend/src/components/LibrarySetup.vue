@@ -10,7 +10,7 @@
     <div class="setup-main">
       <div class="setup-card">
         <div class="card-header">
-          <h2>📁 Pasta da Biblioteca</h2>
+          <h2>Pasta da Biblioteca</h2>
           <p>Escolha a pasta onde estão organizados seus mangás</p>
         </div>
 
@@ -30,7 +30,7 @@
               class="browse-btn"
               title="Selecionar pasta"
             >
-              📂
+              📁 Navegar
             </button>
           </div>
           
@@ -47,7 +47,7 @@
 
         <!-- Preview dos Mangás Encontrados -->
         <div v-if="validation.valid && foundMangas.length > 0" class="preview-section">
-          <h3>📖 Mangás Encontrados ({{ foundMangas.length }})</h3>
+          <h3>Mangás Encontrados ({{ foundMangas.length }})</h3>
           <div class="manga-preview">
             <div 
               v-for="manga in foundMangas.slice(0, 6)" 
@@ -64,14 +64,14 @@
 
         <!-- Biblioteca Anterior (se existir) -->
         <div v-if="previousLibrary" class="previous-section">
-          <h3>🔄 Biblioteca Anterior</h3>
+          <h3>Biblioteca Anterior</h3>
           <div class="previous-path">
             <span class="path-text">{{ previousLibrary }}</span>
             <button 
               @click="usePreviousLibrary" 
               class="use-previous-btn"
             >
-              ↩️ Usar Esta Pasta
+              Usar Esta Pasta
             </button>
           </div>
         </div>
@@ -83,19 +83,12 @@
             :disabled="!validation.valid || isConfiguring"
             class="configure-btn"
           >
-            <span v-if="isConfiguring">⏳ Configurando...</span>
-            <span v-else>🚀 Configurar Biblioteca</span>
-          </button>
-          
-          <button 
-            @click="useMockData"
-            class="mock-btn"
-          >
-            🧪 Usar Dados de Exemplo
+            <span v-if="isConfiguring">Configurando...</span>
+            <span v-else>Configurar Biblioteca</span>
           </button>
 
           <router-link to="/library" class="back-btn">
-            ← Voltar para Biblioteca
+            Voltar para Biblioteca
           </router-link>
         </div>
       </div>
@@ -213,7 +206,7 @@ export default {
       alert('💡 Digite o caminho da pasta no campo acima.\n\nExemplos:\n• Linux: /home/user/Mangás\n• Windows: C:\\Usuário\\Mangás\n• Mac: /Users/user/Mangás')
     }
     
-const configureLibrary = async () => {
+    const configureLibrary = async () => {
       if (!validation.value.valid) return
       
       isConfiguring.value = true
@@ -269,22 +262,6 @@ const configureLibrary = async () => {
       validatePath()
     }
     
-    const useMockData = async () => {
-      isConfiguring.value = true
-      
-      try {
-        // Usar dados mock do store
-        await libraryStore.loadMockData()
-        router.push('/library')
-        
-      } catch (error) {
-        console.error('Erro ao carregar dados mock:', error)
-        alert('❌ Erro ao carregar dados de exemplo')
-      } finally {
-        isConfiguring.value = false
-      }
-    }
-    
     // Carregar biblioteca anterior ao montar
     onMounted(() => {
       if (libraryStore.libraryPath) {
@@ -307,8 +284,7 @@ const configureLibrary = async () => {
       validatePathDebounced,
       browseFolder,
       configureLibrary,
-      usePreviousLibrary,
-      useMockData
+      usePreviousLibrary
     }
   }
 }
@@ -327,20 +303,10 @@ const configureLibrary = async () => {
   margin-bottom: 40px;
 }
 
-.setup-icon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-}
-
 .setup-header h1 {
   font-size: 2.5rem;
   margin-bottom: 10px;
-}
-
-.ohara-text {
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: white;
 }
 
 .setup-header p {
@@ -366,8 +332,9 @@ const configureLibrary = async () => {
 }
 
 .card-header h2 {
-  color: #4ecdc4;
+  color: #fff;
   margin-bottom: 10px;
+  font-size: 1.5rem;
 }
 
 .card-header p {
@@ -379,7 +346,7 @@ const configureLibrary = async () => {
   display: block;
   margin-bottom: 10px;
   font-weight: bold;
-  color: #4ecdc4;
+  color: #fff;
 }
 
 .input-group {
@@ -404,13 +371,15 @@ const configureLibrary = async () => {
 }
 
 .browse-btn {
-  padding: 15px 20px;
+  padding: 15px 25px;
   background: linear-gradient(45deg, #4ecdc4, #44a08d);
   border: none;
   border-radius: 10px;
   color: white;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: transform 0.2s ease;
 }
 
 .browse-btn:hover {
@@ -547,20 +516,6 @@ const configureLibrary = async () => {
   transform: none;
 }
 
-.mock-btn {
-  padding: 15px 30px;
-  background: linear-gradient(45deg, #ff9f43, #ff7675);
-  border: none;
-  border-radius: 10px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.mock-btn:hover {
-  transform: translateY(-2px);
-}
-
 .back-btn {
   padding: 15px 25px;
   background: rgba(255, 255, 255, 0.1);
@@ -570,6 +525,7 @@ const configureLibrary = async () => {
   text-decoration: none;
   text-align: center;
   transition: all 0.3s ease;
+  font-weight: 500;
 }
 
 .back-btn:hover {
@@ -577,7 +533,7 @@ const configureLibrary = async () => {
 }
 
 .help-card h3 {
-  color: #4ecdc4;
+  color: #fff;
   margin-bottom: 20px;
 }
 
@@ -624,4 +580,4 @@ const configureLibrary = async () => {
     flex: none;
   }
 }
-</style>
+</style>  
