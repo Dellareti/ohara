@@ -209,7 +209,7 @@ export default {
 /* Main Content */
 .app-main {
   flex: 1;
-  max-width: 1600px;
+  max-width: auto;
   margin: 0 auto;
   width: 100%;
   padding: 2rem;
