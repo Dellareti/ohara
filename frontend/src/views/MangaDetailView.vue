@@ -291,7 +291,9 @@ export default {
       error.value = null
       
       try {
+        console.log('📖 Carregando mangá:', mangaId.value)
         const mangaData = await libraryStore.fetchManga(mangaId.value)
+
         manga.value = {
           ...mangaData,
           // Adicionar propriedades de UI
@@ -301,10 +303,17 @@ export default {
             isRead: false, // TODO: Carregar do progresso real
             readProgress: 0, // TODO: Carregar progresso real
             isDownloading: false,
-            thumbnail: chapter.pages?.[0]?.path || null
+            thumbnail: chapter.pages?.[0]?.path 
+              ? `http://localhost:8000${chapter.pages[0].path}` 
+              : null
           })) || []
         }
         
+        console.log('📚 Capítulos carregados:')
+        manga.value.chapters.forEach(ch => {
+          console.log(`  - ID: "${ch.id}" | Nome: "${ch.name}"`)
+        })
+
         // Carregar progresso de leitura atual
         loadReadingProgress()
         
@@ -352,14 +361,16 @@ export default {
 
     const openChapter = (chapter) => {
       console.log('📖 Abrindo capítulo:', chapter.name)
-      
+      console.log('🔗 ID do capítulo:', chapter.id)
+      const chapterId = chapter.id // Usar o ID que vem do backend
+
       // Salvar como capítulo atual
       currentChapterId.value = chapter.id
       saveReadingProgress()
       
       // Navegar para o leitor
       router.push({
-        name: 'Reader',
+        name: 'MangaReader',
         params: {
           mangaId: mangaId.value,
           chapterId: chapter.id
