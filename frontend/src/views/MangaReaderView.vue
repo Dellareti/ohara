@@ -24,8 +24,8 @@
         <div class="header-left">
           <button @click="goBack" class="control-btn">← Voltar</button>
           <div class="chapter-info">
-            <h3>{{ readerStore.currentManga?.title || 'Hunter x Hunter' }}</h3>
-            <p>{{ readerStore.currentChapter?.chapter?.name || 'Capítulo 410' }}</p>
+            <h3>{{ readerStore.currentManga?.title || 'Carregando...' }}</h3>
+            <p>{{ readerStore.currentChapter?.chapter?.name || 'Carregando...' }}</p>
           </div>
         </div>
         <div class="header-right">
@@ -144,7 +144,11 @@
         </div>
 
         <div class="footer-controls">
-          <button @click="previousChapter" :disabled="!hasPreviousChapter" class="control-btn">
+          <button 
+            @click="previousChapter" 
+            :disabled="!hasPreviousChapter" 
+            class="control-btn"
+          >
             ⏮️ Cap. Anterior
           </button>
           <button @click="previousPage" :disabled="!canGoPrevious" class="control-btn">
@@ -159,7 +163,11 @@
           <button @click="nextPage" :disabled="!canGoNext" class="control-btn">
             Próxima ⏩
           </button>
-          <button @click="nextChapter" :disabled="!hasNextChapter" class="control-btn">
+          <button 
+            @click="nextChapter" 
+            :disabled="!hasNextChapter" 
+            class="control-btn"
+          >
             Próx. Cap. ⏭️
           </button>
         </div>
@@ -261,18 +269,14 @@ export default {
 
     // Methods
     const getPageImageUrl = (pageIndex) => {
-      console.log('🖼️ Gerando URL para página:', pageIndex)
-      
       // Verificar se temos dados do capítulo
       if (!readerStore.currentChapter?.chapter?.pages) {
-        console.warn('⚠️ Sem dados de páginas disponíveis')
         return `https://via.placeholder.com/800x1200/333/fff?text=Sem+Dados+Disponíveis`
       }
 
       // Verificar se a página existe
       const page = readerStore.currentChapter.chapter.pages[pageIndex]
       if (!page) {
-        console.warn(`⚠️ Página ${pageIndex} não encontrada`)
         return `https://via.placeholder.com/800x1200/ff6b6b/fff?text=Página+${pageIndex + 1}+Não+Encontrada`
       }
 
@@ -280,27 +284,22 @@ export default {
       let imageUrl = ''
       
       if (page.url) {
-        // Se a página já tem URL completa
         imageUrl = page.url
       } else if (page.path) {
-        // Se tem caminho relativo
         imageUrl = page.path.startsWith('http') ? page.path : `${API_BASE_URL}${page.path}`
       } else {
-        // Construir URL baseada nos parâmetros da rota
         imageUrl = `${API_BASE_URL}/api/manga/${mangaId.value}/chapter/${chapterId.value}/page/${pageIndex}`
       }
 
-      console.log(`✅ URL gerada para página ${pageIndex}:`, imageUrl)
       return imageUrl
     }
 
     const handleImageError = (event) => {
-      console.error('❌ Erro ao carregar imagem:', event.target.src)
       event.target.src = `https://via.placeholder.com/800x1200/ff6b6b/fff?text=Erro+ao+Carregar+Página`
     }
 
     const handleImageLoad = (event) => {
-      console.log('✅ Imagem carregada com sucesso:', event.target.src)
+      // Imagem carregada com sucesso
     }
 
     const loadChapter = async () => {
@@ -313,13 +312,10 @@ export default {
       error.value = null
       
       try {
-        console.log(`📖 Carregando capítulo: ${mangaId.value}/${chapterId.value}`)
         await readerStore.loadChapter(mangaId.value, chapterId.value)
-        console.log('✅ Capítulo carregado com sucesso')
         resetControlsTimer()
       } catch (err) {
         error.value = `Erro ao carregar capítulo: ${err.message}`
-        console.error('❌ Erro detalhado:', err)
       } finally {
         loading.value = false
       }
@@ -358,14 +354,8 @@ export default {
     }
 
     const nextChapter = () => {
-      console.log('🔍 DEBUG nextChapter chamado')
-      console.log('🔍 readerStore.navigation:', readerStore.navigation)
-      console.log('🔍 hasNextChapter:', hasNextChapter.value)
-      
       if (readerStore.navigation?.nextChapter) {
         const nextChapterId = readerStore.navigation.nextChapter.id
-        console.log('📖 Navegando para próximo capítulo:', nextChapterId)
-        console.log('📖 mangaId atual:', mangaId.value)
         
         router.push({
           name: 'MangaReader',
@@ -375,20 +365,13 @@ export default {
           }
         })
       } else {
-        console.warn('⚠️ Não há próximo capítulo disponível')
-        console.log('⚠️ navigation object:', readerStore.navigation)
+        showTemporaryMessage('📖 Este é o último capítulo disponível')
       }
     }
 
     const previousChapter = () => {
-      console.log('🔍 DEBUG previousChapter chamado')
-      console.log('🔍 readerStore.navigation:', readerStore.navigation)
-      console.log('🔍 hasPreviousChapter:', hasPreviousChapter.value)
-      
       if (readerStore.navigation?.previousChapter) {
         const prevChapterId = readerStore.navigation.previousChapter.id
-        console.log('📖 Navegando para capítulo anterior:', prevChapterId)
-        console.log('📖 mangaId atual:', mangaId.value)
         
         router.push({
           name: 'MangaReader',
@@ -398,9 +381,36 @@ export default {
           }
         })
       } else {
-        console.warn('⚠️ Não há capítulo anterior disponível')
-        console.log('⚠️ navigation object:', readerStore.navigation)
+        showTemporaryMessage('📖 Este é o primeiro capítulo')
       }
+    }
+
+    const showTemporaryMessage = (message) => {
+      const messageEl = document.createElement('div')
+      messageEl.className = 'temporary-message'
+      messageEl.textContent = message
+      messageEl.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 8px;
+        z-index: 9999;
+        font-size: 1.1rem;
+        border: 2px solid #4ecdc4;
+        animation: fadeInOut 2s ease-in-out;
+      `
+      
+      document.body.appendChild(messageEl)
+      
+      setTimeout(() => {
+        if (document.body.contains(messageEl)) {
+          document.body.removeChild(messageEl)
+        }
+      }, 2000)
     }
 
     const toggleControls = () => {
@@ -499,14 +509,19 @@ export default {
             closeSettings()
           }
           break
+        case 'PageDown':
+          event.preventDefault()
+          nextChapter()
+          break
+        case 'PageUp':
+          event.preventDefault()
+          previousChapter()
+          break
       }
     }
 
     // Lifecycle
     onMounted(() => {
-      console.log('🚀 MangaReaderView montado')
-      console.log('📊 Parâmetros da rota:', { mangaId: mangaId.value, chapterId: chapterId.value })
-      
       readerStore.loadSettings()
       loadChapter()
       
@@ -514,14 +529,6 @@ export default {
       document.addEventListener('fullscreenchange', () => {
         readerStore.isFullscreen = !!document.fullscreenElement
       })
-
-      setTimeout(() => {
-        console.log('🔍 Estado do store após carregamento:', {
-          currentChapter: readerStore.currentChapter,
-          totalPages: readerStore.totalPages,
-          currentPage: readerStore.currentPage
-        })
-      }, 2000)
     })
 
     onUnmounted(() => {
@@ -533,7 +540,6 @@ export default {
 
     // Watch route changes
     watch(() => route.params, (newParams, oldParams) => {
-      console.log('🔄 Rota alterada:', { old: oldParams, new: newParams })
       if (newParams.chapterId !== oldParams?.chapterId) {
         loadChapter()
       }
@@ -627,266 +633,6 @@ export default {
   100% { transform: rotate(360deg); }
 }
 
-.retry-btn {
-  background: #4ecdc4;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: #ff6b6b;
-  color: white;
-}
-
-.setting-group {
-  margin-bottom: 1.5rem;
-}
-
-.setting-label {
-  display: block;
-  margin-bottom: 0.75rem;
-  font-weight: 600;
-  color: #4ecdc4;
-  font-size: 1rem;
-}
-
-.setting-select {
-  width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #4ecdc4;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.setting-select:focus {
-  outline: none;
-  border-color: #44a08d;
-  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
-}
-
-.setting-select option {
-  background: #1e1e2e;
-  color: white;
-  padding: 0.5rem;
-}
-
-.setting-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.primary-btn, .secondary-btn {
-  flex: 1;
-  padding: 0.75rem;
-  border: 2px solid;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.primary-btn {
-  border-color: #4ecdc4;
-  background: #4ecdc4;
-  color: white;
-}
-
-.primary-btn:hover {
-  background: #44a08d;
-  border-color: #44a08d;
-}
-
-.secondary-btn {
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.2);
-  color: #ff6b6b;
-}
-
-.secondary-btn:hover {
-  background: #ff6b6b;
-  color: white;
-}
-
-/* Floating Actions */
-.floating-actions {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  z-index: 150;
-}
-
-.fab {
-  width: 56px;
-  height: 56px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
-}
-
-.fab.auto-scroll.active {
-  background: #4ecdc4;
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.5);
-}
-
-.debug-btn {
-  background: rgba(255, 107, 107, 0.7) !important;
-}
-
-/* Scrollbar customization */
-.vertical-container::-webkit-scrollbar,
-.webtoon-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.vertical-container::-webkit-scrollbar-track,
-.webtoon-container::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.vertical-container::-webkit-scrollbar-thumb,
-.webtoon-container::-webkit-scrollbar-thumb {
-  background: #4ecdc4;
-  border-radius: 4px;
-}
-
-.vertical-container::-webkit-scrollbar-thumb:hover,
-.webtoon-container::-webkit-scrollbar-thumb:hover {
-  background: #44a08d;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .reader-header, .reader-footer {
-    padding: 1rem;
-  }
-  
-  .header-left, .header-right {
-    gap: 0.5rem;
-  }
-  
-  .footer-controls {
-    gap: 0.5rem;
-    font-size: 0.9rem;
-  }
-  
-  .settings-panel {
-    width: 100%;
-  }
-  
-  .floating-actions {
-    bottom: 1rem;
-    right: 1rem;
-  }
-  
-  .control-btn {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
-  }
-  
-  .double-pages {
-    gap: 5px;
-  }
-  
-  .manga-page.fit-width {
-    max-width: 95vw;
-  }
-}
-
-@media (max-width: 480px) {
-  .settings-content {
-    padding: 1rem;
-  }
-  
-  .footer-controls {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  
-  .chapter-info h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-  }
-  
-  .debug-info {
-    left: 10px;
-    right: 10px;
-    width: auto;
-  }
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.reader-content {
-  animation: fadeIn 0.3s ease-in;
-}
-
-.settings-panel {
-  animation: slideUp 0.3s ease-out;
-}
-
-/* Hover effects */
-.control-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
-}
-
-.setting-select:hover {
-  border-color: #44a08d;
-}
-
-.mode-select:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Loading animation */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.reader-loading p {
-  animation: pulse 2s infinite;
-}
 .retry-btn {
   background: #4ecdc4;
   border: none;
@@ -1264,82 +1010,6 @@ export default {
   color: white;
 }
 
-/* Debug Info */
-.debug-info {
-  position: fixed;
-  top: 100px;
-  left: 20px;
-  background: rgba(0, 0, 0, 0.9);
-  color: #4ecdc4;
-  padding: 1rem;
-  border-radius: 8px;
-  border: 2px solid #4ecdc4;
-  z-index: 300;
-  font-family: monospace;
-  font-size: 0.9rem;
-}
-
-.debug-info h4 {
-  margin: 0 0 0.5rem 0;
-  color: #ff6b6b;
-}
-
-.debug-info p {
-  margin: 0.25rem 0;
-}
-
-.debug-close {
-  background: #ff6b6b;
-  border: none;
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  margin-top: 0.5rem;
-}
-
-/* Floating Actions */
-.floating-actions {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  z-index: 150;
-}
-
-.fab {
-  width: 56px;
-  height: 56px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
-}
-
-.fab.auto-scroll.active {
-  background: #4ecdc4;
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.5);
-}
-
-.debug-btn {
-  background: rgba(255, 107, 107, 0.7) !important;
-}
-
 /* Scrollbar customization */
 .vertical-container::-webkit-scrollbar,
 .webtoon-container::-webkit-scrollbar {
@@ -1381,11 +1051,6 @@ export default {
     width: 100%;
   }
   
-  .floating-actions {
-    bottom: 1rem;
-    right: 1rem;
-  }
-  
   .control-btn {
     padding: 0.4rem 0.8rem;
     font-size: 0.9rem;
@@ -1415,12 +1080,6 @@ export default {
     font-size: 1rem;
     font-weight: 600;
   }
-  
-  .debug-info {
-    left: 10px;
-    right: 10px;
-    width: auto;
-  }
 }
 
 /* Animations */
@@ -1432,6 +1091,13 @@ export default {
 @keyframes slideUp {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
 }
 
 .reader-content {
@@ -1464,5 +1130,10 @@ export default {
 
 .reader-loading p {
   animation: pulse 2s infinite;
+}
+
+/* Temporary Message */
+.temporary-message {
+  animation: fadeInOut 2s ease-in-out;
 }
 </style>

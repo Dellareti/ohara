@@ -38,18 +38,6 @@
 
         <!-- Manga Information -->
         <div class="manga-info-section">
-          
-          <!-- Author & Artist -->
-          <div class="manga-creators">
-            <div v-if="manga.author" class="creator-info">
-              <span class="creator-label">Autor:</span>
-              <span class="creator-name">{{ manga.author }}</span>
-            </div>
-            <div v-if="manga.artist" class="creator-info">
-              <span class="creator-label">Artista:</span>
-              <span class="creator-name">{{ manga.artist }}</span>
-            </div>
-          </div>
 
           <!-- Status -->
           <div v-if="manga.status" class="status-section">
@@ -791,16 +779,6 @@ export default {
   line-height: 1.3;
   margin: 0;
   text-align: center;
-}
-
-.manga-creators, .status-section, .genres-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .creator-info {

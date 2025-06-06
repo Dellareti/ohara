@@ -28,11 +28,11 @@ export const useReaderStore = defineStore('reader', {
     hideControls: false,
     showSettings: false,
     
-    // Navegação
     navigation: {
       previousChapter: null,
       nextChapter: null,
-      chapterIndex: { current: 0, total: 0 }
+      chapterIndex: { current: 0, total: 0 },
+      allChapters: [] 
     },
     
     // Progresso
@@ -80,9 +80,24 @@ export const useReaderStore = defineStore('reader', {
       return Math.round((state.currentPage / Math.max(state.totalPages - 1, 1)) * 100)
     },
     
-    // Verificar se tem capítulos anteriores/próximos
-    hasPreviousChapter: (state) => state.navigation.previousChapter !== null,
-    hasNextChapter: (state) => state.navigation.nextChapter !== null,
+    // Verificar navegação baseada na lista completa
+    hasPreviousChapter: (state) => {
+      console.log('🔍 Verificando capítulo anterior:', {
+        navigation: state.navigation,
+        previousChapter: state.navigation.previousChapter,
+        allChapters: state.navigation.allChapters?.length
+      })
+      return state.navigation.previousChapter !== null
+    },
+    
+    hasNextChapter: (state) => {
+      console.log('🔍 Verificando próximo capítulo:', {
+        navigation: state.navigation,
+        nextChapter: state.navigation.nextChapter,
+        allChapters: state.navigation.allChapters?.length
+      })
+      return state.navigation.nextChapter !== null
+    },
     
     // Tempo de leitura atual
     currentReadingTime: (state) => {
@@ -100,26 +115,32 @@ export const useReaderStore = defineStore('reader', {
       try {
         console.log(`📖 Carregando capítulo: ${mangaId}/${chapterId}`)
         
-        // Fazer requisição para o backend
+        // 1. Carregar dados do capítulo
         const response = await axios.get(`${API_BASE_URL}/api/manga/${mangaId}/chapter/${chapterId}`)
         const data = response.data
         
-        // Atualizar estado
+        console.log('📊 Dados recebidos do backend:', data)
+        
+        // 2. Atualizar estado básico
         this.currentManga = data.manga
         this.currentChapter = data
-        this.navigation = data.navigation
         this.totalPages = data.chapter.pages.length
         
-        // Carregar progresso salvo
+        // 3. Carregar lista completa de capítulos para navegação
+        await this.loadChapterNavigation(mangaId, chapterId)
+        
+        // 4. Carregar progresso salvo
         await this.loadChapterProgress(mangaId, chapterId)
         
-        // Iniciar timer de leitura
+        // 5. Iniciar timer de leitura
         this.readingStartTime = Date.now()
         
-        // Pré-carregar páginas
+        // 6. Pré-carregar páginas
         this.preloadPages()
         
         console.log(`✅ Capítulo carregado: ${data.chapter.name} (${this.totalPages} páginas)`)
+        console.log('🧭 Navegação final:', this.navigation)
+        
         return data
         
       } catch (error) {
@@ -129,6 +150,153 @@ export const useReaderStore = defineStore('reader', {
       } finally {
         this.loading = false
       }
+    },
+
+    // Método para carregar navegação entre capítulos
+    async loadChapterNavigation(mangaId, currentChapterId) {
+      try {
+        console.log(`🧭 Carregando navegação para: ${mangaId}/${currentChapterId}`)
+        
+        // Buscar lista de todos os capítulos do mangá
+        const chaptersResponse = await axios.get(`${API_BASE_URL}/api/manga/${mangaId}/chapters`)
+        const chaptersData = chaptersResponse.data
+        
+        console.log('📚 Lista de capítulos recebida:', chaptersData)
+        
+        if (!chaptersData.chapters || !Array.isArray(chaptersData.chapters)) {
+          console.warn('⚠️ Lista de capítulos inválida')
+          this.navigation = {
+            previousChapter: null,
+            nextChapter: null,
+            chapterIndex: { current: 0, total: 0 },
+            allChapters: []
+          }
+          return
+        }
+        
+        const allChapters = chaptersData.chapters
+        this.navigation.allChapters = allChapters
+        
+        // Encontrar índice do capítulo atual
+        const currentIndex = allChapters.findIndex(ch => 
+          ch.id === currentChapterId || 
+          ch.id.includes(currentChapterId) ||
+          currentChapterId.includes(ch.id)
+        )
+        
+        console.log(`🎯 Capítulo atual encontrado no índice: ${currentIndex}`)
+        console.log(`🔍 Procurando por ID: "${currentChapterId}"`)
+        console.log('📋 IDs disponíveis:', allChapters.map(ch => ch.id))
+        
+        if (currentIndex === -1) {
+          console.warn('⚠️ Capítulo atual não encontrado na lista')
+          // Tentar busca mais flexível
+          const flexibleIndex = this.findChapterFlexible(allChapters, currentChapterId)
+          if (flexibleIndex !== -1) {
+            console.log(`✅ Capítulo encontrado com busca flexível no índice: ${flexibleIndex}`)
+            this.setupNavigation(allChapters, flexibleIndex)
+          } else {
+            this.navigation = {
+              previousChapter: null,
+              nextChapter: null,
+              chapterIndex: { current: 0, total: allChapters.length },
+              allChapters: allChapters
+            }
+          }
+          return
+        }
+        
+        this.setupNavigation(allChapters, currentIndex)
+        
+      } catch (error) {
+        console.error('❌ Erro ao carregar navegação:', error)
+        this.navigation = {
+          previousChapter: null,
+          nextChapter: null,
+          chapterIndex: { current: 0, total: 0 },
+          allChapters: []
+        }
+      }
+    },
+
+    // Busca flexível para IDs de capítulos
+    findChapterFlexible(chapters, targetId) {
+      console.log(`🔍 Busca flexível para: "${targetId}"`)
+      
+      // Tentar várias estratégias de busca
+      const strategies = [
+        // 1. Busca exata
+        (id) => chapters.findIndex(ch => ch.id === id),
+        
+        // 2. Busca parcial (contém)
+        (id) => chapters.findIndex(ch => ch.id.includes(id) || id.includes(ch.id)),
+        
+        // 3. Busca por número de capítulo extraído
+        (id) => {
+          const match = id.match(/(\d+(?:\.\d+)?)/);
+          if (match) {
+            const number = parseFloat(match[1]);
+            return chapters.findIndex(ch => ch.number === number);
+          }
+          return -1;
+        },
+        
+        // 4. Busca por nome normalizado
+        (id) => {
+          const normalizedId = id.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return chapters.findIndex(ch => {
+            const normalizedChId = ch.id.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return normalizedChId.includes(normalizedId) || normalizedId.includes(normalizedChId);
+          });
+        }
+      ];
+      
+      for (let i = 0; i < strategies.length; i++) {
+        const index = strategies[i](targetId);
+        if (index !== -1) {
+          console.log(`✅ Estratégia ${i + 1} encontrou capítulo no índice: ${index}`);
+          return index;
+        }
+      }
+      
+      console.warn('❌ Nenhuma estratégia encontrou o capítulo');
+      return -1;
+    },
+
+    // Configurar navegação baseada no índice
+    setupNavigation(allChapters, currentIndex) {
+      const total = allChapters.length;
+      
+      // Capítulo anterior (índice maior, pois lista está em ordem decrescente)
+      const previousChapter = currentIndex < total - 1 ? allChapters[currentIndex + 1] : null;
+      
+      // Próximo capítulo (índice menor)
+      const nextChapter = currentIndex > 0 ? allChapters[currentIndex - 1] : null;
+      
+      this.navigation = {
+        previousChapter: previousChapter ? {
+          id: previousChapter.id,
+          name: previousChapter.name,
+          number: previousChapter.number
+        } : null,
+        nextChapter: nextChapter ? {
+          id: nextChapter.id,
+          name: nextChapter.name,
+          number: nextChapter.number
+        } : null,
+        chapterIndex: {
+          current: currentIndex + 1,
+          total: total
+        },
+        allChapters: allChapters
+      };
+      
+      console.log('🧭 Navegação configurada:', {
+        current: currentIndex + 1,
+        total: total,
+        previous: this.navigation.previousChapter?.name,
+        next: this.navigation.nextChapter?.name
+      });
     },
 
     // Carregar progresso do capítulo
@@ -318,7 +486,8 @@ export const useReaderStore = defineStore('reader', {
       this.navigation = {
         previousChapter: null,
         nextChapter: null,
-        chapterIndex: { current: 0, total: 0 }
+        chapterIndex: { current: 0, total: 0 },
+        allChapters: []
       }
       this.readingStartTime = null
       this.preloadedPages.clear()
