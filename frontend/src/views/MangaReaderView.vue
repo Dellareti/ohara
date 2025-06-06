@@ -207,24 +207,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Debug Info -->
-    <div v-if="showDebug" class="debug-info">
-      <h4>🐛 Debug Info:</h4>
-      <p>Current Page: {{ readerStore.currentPage }}</p>
-      <p>Total Pages: {{ readerStore.totalPages }}</p>
-      <p>Chapter: {{ readerStore.currentChapter?.chapter?.id }}</p>
-      <p>Manga: {{ readerStore.currentManga?.id }}</p>
-      <button @click="showDebug = false" class="debug-close">❌ Fechar</button>
-    </div>
-
-    <!-- Floating Actions -->
-    <div class="floating-actions" v-if="!readerStore.hideControls">
-      <button @click="toggleAutoScroll" class="fab auto-scroll" :class="{ active: readerStore.autoScrollActive }">
-        {{ readerStore.autoScrollActive ? '⏸️' : '▶️' }}
-      </button>
-      <button @click="showDebug = !showDebug" class="fab debug-btn">🐛</button>
-    </div>
   </div>
 </template>
 
@@ -245,7 +227,6 @@ export default {
     // Reactive data
     const loading = ref(false)
     const error = ref(null)
-    const showDebug = ref(false)
     
     // Auto-hide controls
     let controlsTimeout = null
@@ -377,16 +358,48 @@ export default {
     }
 
     const nextChapter = () => {
-      if (readerStore.navigation.nextChapter) {
+      console.log('🔍 DEBUG nextChapter chamado')
+      console.log('🔍 readerStore.navigation:', readerStore.navigation)
+      console.log('🔍 hasNextChapter:', hasNextChapter.value)
+      
+      if (readerStore.navigation?.nextChapter) {
         const nextChapterId = readerStore.navigation.nextChapter.id
-        router.push(`/manga/${mangaId.value}/chapter/${nextChapterId}`)
+        console.log('📖 Navegando para próximo capítulo:', nextChapterId)
+        console.log('📖 mangaId atual:', mangaId.value)
+        
+        router.push({
+          name: 'MangaReader',
+          params: { 
+            mangaId: mangaId.value, 
+            chapterId: nextChapterId 
+          }
+        })
+      } else {
+        console.warn('⚠️ Não há próximo capítulo disponível')
+        console.log('⚠️ navigation object:', readerStore.navigation)
       }
     }
 
     const previousChapter = () => {
-      if (readerStore.navigation.previousChapter) {
+      console.log('🔍 DEBUG previousChapter chamado')
+      console.log('🔍 readerStore.navigation:', readerStore.navigation)
+      console.log('🔍 hasPreviousChapter:', hasPreviousChapter.value)
+      
+      if (readerStore.navigation?.previousChapter) {
         const prevChapterId = readerStore.navigation.previousChapter.id
-        router.push(`/manga/${mangaId.value}/chapter/${prevChapterId}`)
+        console.log('📖 Navegando para capítulo anterior:', prevChapterId)
+        console.log('📖 mangaId atual:', mangaId.value)
+        
+        router.push({
+          name: 'MangaReader',
+          params: { 
+            mangaId: mangaId.value, 
+            chapterId: prevChapterId 
+          }
+        })
+      } else {
+        console.warn('⚠️ Não há capítulo anterior disponível')
+        console.log('⚠️ navigation object:', readerStore.navigation)
       }
     }
 
@@ -426,10 +439,6 @@ export default {
       } catch (err) {
         console.error('Erro ao alternar fullscreen:', err)
       }
-    }
-
-    const toggleAutoScroll = () => {
-      readerStore.toggleAutoScroll()
     }
 
     const seekToPosition = (event) => {
@@ -534,7 +543,6 @@ export default {
       readerStore,
       loading,
       error,
-      showDebug,
       progressPercentage,
       currentDoublePage,
       canGoPrevious,
@@ -553,7 +561,6 @@ export default {
       toggleSettings,
       closeSettings,
       toggleFullscreen,
-      toggleAutoScroll,
       seekToPosition,
       goBack,
       resetSettings,
@@ -712,41 +719,6 @@ export default {
 .secondary-btn:hover {
   background: #ff6b6b;
   color: white;
-}
-
-/* Debug Info */
-.debug-info {
-  position: fixed;
-  top: 100px;
-  left: 20px;
-  background: rgba(0, 0, 0, 0.9);
-  color: #4ecdc4;
-  padding: 1rem;
-  border-radius: 8px;
-  border: 2px solid #4ecdc4;
-  z-index: 300;
-  font-family: monospace;
-  font-size: 0.9rem;
-}
-
-.debug-info h4 {
-  margin: 0 0 0.5rem 0;
-  color: #ff6b6b;
-}
-
-.debug-info p {
-  margin: 0.25rem 0;
-}
-
-.debug-close {
-  background: #ff6b6b;
-  border: none;
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  margin-top: 0.5rem;
 }
 
 /* Floating Actions */

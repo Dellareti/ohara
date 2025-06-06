@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from pathlib import Path
 from typing import List
 import os
@@ -17,16 +18,16 @@ class Settings(BaseSettings):
     port: int = 8000
     
     # Configurações de CORS
-    allowed_origins: List[str] = [
+    allowed_origins: List[str] = Field(default=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000"
-    ]
+    ])
     
     # Configurações de arquivos
     max_file_size: int = 50 * 1024 * 1024  # 50MB
-    supported_image_formats: List[str] = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
-    supported_archive_formats: List[str] = [".zip", ".rar", ".cbz", ".cbr"]
+    supported_image_formats: List[str] = Field(default=[".jpg", ".jpeg", ".png", ".gif", ".webp"])
+    supported_archive_formats: List[str] = Field(default=[".zip", ".rar", ".cbz", ".cbr"])
     
     # Configurações de thumbnail
     thumbnail_size: tuple = (300, 400)
@@ -36,16 +37,17 @@ class Settings(BaseSettings):
     cache_thumbnails: bool = True
     cache_dir: str = "cache"
     
-    # Configurações de banco de dados (SQLite para simplicidade)
+    # Configurações de banco de dados 
     database_url: str = "sqlite:///./ohara.db"
     
     # Configurações de logging
     log_level: str = "INFO"
     log_file: str = "ohara.log"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 # Instância global de configurações
 _settings = None
@@ -60,9 +62,12 @@ def get_settings() -> Settings:
 # Constantes úteis
 SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
 CHAPTER_PATTERNS = [
-    r'[Cc]ap[ií]tulo\s*(\d+)',
-    r'[Cc]hapter\s*(\d+)',
-    r'[Cc]h\s*(\d+)',
-    r'[Vv]ol\.?\s*(\d+)\s*[Cc]h\.?\s*(\d+)',
-    r'(\d+)(?:\s*-.*)?$'
+    r'Vol\.\s*\d+,\s*Ch\.\s*(\d+\.?\d*)',  # "Vol. 1, Ch. 1.5"
+    r'Volume\s*\d+\s*Chapter\s*(\d+\.?\d*)', # "Volume 1 Chapter 1"
+    r'[Vv]ol\.?\s*(\d+)\s*[Cc]h\.?\s*(\d+\.?\d*)', # "Vol 1 Ch 2"
+    r'[Cc]hapter\s*(\d+\.?\d*)', # "Chapter 1"
+    r'[Cc]ap[ií]tulo\s*(\d+\.?\d*)', # "Capítulo 1"
+    r'[Cc]h\.?\s*(\d+\.?\d*)', # "Ch. 1" ou "Ch 1"
+    r'^(\d+\.?\d*)(?:\s*[-_].*)?', # "1 - Título" ou "1_titulo"
+    r'(\d+\.?\d*)(?:\s|$)', # Números decimais como "1.5"
 ]

@@ -222,8 +222,8 @@ class MangaScanner:
         # Buscar thumbnail (método original - já é rápido)
         manga.thumbnail = self._find_thumbnail(manga_path)
         
-        # Escanear capítulos com lazy loading
-        chapters = self._scan_chapters_lazy(manga_path, manga_id)
+        # Escanear capítulos com método corrigido
+        chapters = self._scan_chapters_optimized(manga_path, manga_id)
         
         if not chapters:
             return None
@@ -235,9 +235,10 @@ class MangaScanner:
         
         return manga
     
-    def _scan_chapters_lazy(self, manga_path: Path, manga_id: str) -> List[Chapter]:
-        """Escanear capítulos com lazy loading de páginas"""
+    def _scan_chapters_optimized(self, manga_path: Path, manga_id: str) -> List[Chapter]:
+        """✅ MÉTODO CORRIGIDO: Escanear capítulos otimizado"""
         chapters = []
+        sequential_index = 1  # Para garantir IDs únicos
         
         try:
             # Usar os.scandir() para performance
@@ -248,41 +249,60 @@ class MangaScanner:
             chapter_entries = [{'path': str(d), 'name': d.name} for d in manga_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
             chapter_entries = [type('Entry', (), entry) for entry in chapter_entries]
         
+        # Ordenar entries por nome
+        chapter_entries.sort(key=lambda e: self._natural_sort_key(getattr(e, 'name', 'unknown')))
+        
         for entry in chapter_entries:
             try:
                 chapter_path = Path(entry.path) if hasattr(entry, 'path') else Path(entry.name)
                 if not chapter_path.is_absolute():
                     chapter_path = manga_path / chapter_path
                 
-                chapter = self._scan_chapter_lazy(chapter_path, manga_id)
+                # Usar o método híbrido corrigido
+                chapter = self._scan_chapter_hybrid(chapter_path, manga_id, sequential_index)
                 if chapter:
                     chapters.append(chapter)
+                    sequential_index += 1
             except Exception as e:
                 print(f"⚠️ Erro no capítulo {getattr(entry, 'name', 'unknown')}: {e}")
+                # Fallback: usar método original
+                try:
+                    chapter = self._scan_chapter(chapter_path, manga_id)
+                    if chapter:
+                        chapters.append(chapter)
+                        sequential_index += 1
+                except Exception as e2:
+                    print(f"❌ Fallback falhou para {getattr(entry, 'name', 'unknown')}: {e2}")
         
         return chapters
     
-    def _scan_chapter_lazy(self, chapter_path: Path, manga_id: str) -> Optional[Chapter]:
-        """Escanear capítulo com lazy loading"""
+    def _scan_chapter_hybrid(self, chapter_path: Path, manga_id: str, sequential_index: int) -> Optional[Chapter]:
+        """✅ MÉTODO CORRIGIDO: Scanner híbrido com múltiplas estratégias para ID"""
         try:
-            # Parse do nome
-            chapter_info = self._parse_chapter_name(chapter_path.name)
+            # Parse do nome com regex melhorado
+            chapter_info = self._parse_chapter_name_enhanced(chapter_path.name)
             
-            # Contar páginas rapidamente
+            # Contar páginas
             page_count = self._count_image_files_fast(chapter_path)
-            
             if page_count == 0:
                 return None
             
-            # Criar lista de páginas lazy (só nomes, sem metadados)
+            # Criar páginas lazy
             pages = self._create_pages_lazy(chapter_path)
             
-            # Criar capítulo
-            chapter_id = f"{manga_id}-ch-{chapter_info['number'] or page_count}"
+            chapter_number = self._determine_chapter_number(
+                chapter_info=chapter_info,
+                sequential_index=sequential_index,
+                page_count=page_count,
+                chapter_name=chapter_path.name
+            )
+            
+            chapter_id = f"{manga_id}-ch-{chapter_number}"
+            
             chapter = Chapter(
                 id=chapter_id,
                 name=chapter_path.name,
-                number=chapter_info['number'],
+                number=chapter_info['number'],  # Número real parseado (pode ser None)
                 volume=chapter_info['volume'],
                 path=str(chapter_path),
                 pages=pages,
@@ -294,7 +314,6 @@ class MangaScanner:
             
         except Exception as e:
             print(f"⚠️ Erro no capítulo {chapter_path.name}: {e}")
-            # Fallback: usar método original
             return self._scan_chapter(chapter_path, manga_id)
     
     def _count_image_files_fast(self, chapter_path: Path) -> int:
@@ -344,6 +363,52 @@ class MangaScanner:
     def _is_image_file_name(self, filename: str) -> bool:
         """Verificação rápida por extensão"""
         return Path(filename).suffix.lower() in self.supported_extensions
+    
+    def _determine_chapter_number(self, chapter_info: dict, sequential_index: int, page_count: int, chapter_name: str) -> str:
+        """Determinar número do capítulo usando múltiplas estratégias"""
+        # Estratégia 1: Usar número parseado por regex
+        if chapter_info['number'] is not None:
+            return str(chapter_info['number'])
+        
+        # Estratégia 2: Usar índice sequencial
+        return str(sequential_index)
+
+    def _parse_chapter_name_enhanced(self, chapter_name: str) -> Dict:
+        """Parser melhorado com mais padrões"""
+        info = {'number': None, 'volume': None}
+        
+        # Padrões específicos mais rigorosos primeiro
+        enhanced_patterns = [
+            r'Vol\.\s*\d+,\s*Ch\.\s*(\d+\.?\d*)',  # "Vol. 1, Ch. 1"
+            r'Volume\s*\d+\s*Chapter\s*(\d+\.?\d*)', # "Volume 1 Chapter 1"  
+            r'[Vv]ol\.?\s*(\d+)\s*[Cc]h\.?\s*(\d+\.?\d*)', # "Vol 1 Ch 2"
+            r'[Cc]hapter\s*(\d+\.?\d*)', # "Chapter 1"
+            r'[Cc]ap[ií]tulo\s*(\d+\.?\d*)', # "Capítulo 1"
+            r'[Cc]h\.?\s*(\d+\.?\d*)', # "Ch. 1"
+            r'^(\d+\.?\d*)(?:\s*[-_].*)?', # "1 - Título"
+            r'(\d+\.?\d*)(?:\s|$)', # Números soltos
+        ]
+        
+        for pattern in enhanced_patterns:
+            match = re.search(pattern, chapter_name, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+                
+                if len(groups) == 1:
+                    try:
+                        info['number'] = float(groups[0])
+                        break  # Parar no primeiro match
+                    except ValueError:
+                        continue
+                elif len(groups) == 2:
+                    try:
+                        info['volume'] = int(groups[0])
+                        info['number'] = float(groups[1])
+                        break
+                    except ValueError:
+                        continue
+        
+        return info
     
     def _load_cache_safe(self, cache_file: Path) -> Dict:
         """Carregar cache com tratamento seguro de erros"""
@@ -412,10 +477,8 @@ class MangaScanner:
             
             # Calcular economia de espaço
             cache_size_mb = len(cache_json) / 1024 / 1024
-            estimated_full_size = cache_size_mb * 100  # Estimativa sem otimização
             
-            print(f"💾 Cache otimizado salvo: {len(mangas)} mangás")
-            print(f"📊 Tamanho do cache: {cache_size_mb:.2f}MB (economizou ~{estimated_full_size:.1f}MB)")
+            print(f"💾 Cache salvo: {len(mangas)} mangás ({cache_size_mb:.2f}MB)")
             
         except Exception as e:
             print(f"❌ Erro ao salvar cache: {e}")
@@ -430,9 +493,7 @@ class MangaScanner:
             if not manga.thumbnail:
                 manga_path = Path(manga.path)
                 if manga_path.exists():
-                    print(f"🔍 Buscando thumbnail para {manga.title}...")
                     manga.thumbnail = self._find_thumbnail(manga_path)
-                    print(f"📸 Thumbnail encontrada: {manga.thumbnail}")
             
             # Recriar páginas sob demanda para cada capítulo
             for chapter in manga.chapters:
@@ -443,7 +504,6 @@ class MangaScanner:
                         chapter.pages = self._create_pages_lazy(chapter_path)
                         # Validar contagem
                         if len(chapter.pages) != chapter.page_count:
-                            print(f"⚠️ Inconsistência em {chapter.name}: {len(chapter.pages)} vs {chapter.page_count}")
                             chapter.page_count = len(chapter.pages)
             
             return manga
@@ -451,7 +511,6 @@ class MangaScanner:
         except Exception as e:
             print(f"⚠️ Erro ao restaurar mangá do cache: {e}")
             return None
-    
 
     def _create_lightweight_manga_for_cache(self, manga: Manga) -> Dict:
         """Criar versão leve do mangá para cache (sem páginas individuais)"""
@@ -491,8 +550,8 @@ class MangaScanner:
         }
         
         return lightweight_manga
-
-    # === MÉTODOS ORIGINAIS ===
+    
+    # === MÉTODOS ORIGINAIS PRESERVADOS ===
     
     def _scan_library_original(self, library_path: str) -> Library:
         """Método original preservado como fallback"""
@@ -532,11 +591,13 @@ class MangaScanner:
         manga.thumbnail = self._find_thumbnail(manga_path)
         
         chapters = []
+        sequential_index = 1
         for chapter_dir in manga_path.iterdir():
             if chapter_dir.is_dir() and not chapter_dir.name.startswith('.'):
                 chapter = self._scan_chapter(chapter_dir, manga_id)
                 if chapter:
                     chapters.append(chapter)
+                    sequential_index += 1
         
         manga.chapters = self._sort_chapters(chapters)
         manga.chapter_count = len(manga.chapters)
@@ -545,7 +606,7 @@ class MangaScanner:
         return manga
     
     def _scan_chapter(self, chapter_path: Path, manga_id: str) -> Optional[Chapter]:
-        """Método original - mantido para compatibilidade"""
+        """Método original - corrigido para usar índice sequencial"""
         chapter_info = self._parse_chapter_name(chapter_path.name)
         
         pages = []
@@ -568,7 +629,7 @@ class MangaScanner:
         if not pages:
             return None
         
-        chapter_id = f"{manga_id}-ch-{chapter_info['number'] or len(pages)}"
+        chapter_id = f"{manga_id}-ch-{chapter_info['number'] or 1}"
         chapter = Chapter(
             id=chapter_id,
             name=chapter_path.name,

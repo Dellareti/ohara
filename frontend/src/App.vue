@@ -15,12 +15,6 @@
           <router-link to="/library-full" class="nav-link">Versão Completa</router-link>
           <router-link to="/setup" class="nav-link">Setup</router-link>
           <router-link to="/settings" class="nav-link">Configurações</router-link>
-          
-          <!-- Status Indicator -->
-          <div class="connection-status" :class="{ 'connected': isConnected, 'disconnected': !isConnected }">
-            <span class="status-dot"></span>
-            <span class="status-text">{{ isConnected ? 'Online' : 'Offline' }}</span>
-          </div>
         </div>
       </nav>
     </header>

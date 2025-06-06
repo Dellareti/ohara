@@ -64,7 +64,7 @@ def create_image_url(file_path: str) -> str:
 # Criar aplicação FastAPI
 app = FastAPI(
     title="Ohara - Manga Reader API",
-    description="API para leitor de mangás local (Projeto ES2)",
+    description="API para leitor de mangás local",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
