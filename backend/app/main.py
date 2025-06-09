@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from pathlib import Path
 import os
+import urllib.parse
 from typing import Optional
 from datetime import datetime
 import mimetypes
@@ -17,7 +18,7 @@ from .models.manga import LibraryResponse, MangaResponse
 
 def create_image_url(file_path: str) -> str:
     """
-    Cria URL limpa para servir imagens, evitando duplicação
+    Cria URL limpa para servir imagens
     
     Args:
         file_path: Caminho absoluto do arquivo
@@ -28,10 +29,17 @@ def create_image_url(file_path: str) -> str:
     if not file_path:
         return None
     
-    if file_path.startswith('/api/image') or file_path.startswith('http'):
-        print(f"⚠️ URL já processada detectada: {file_path[:50]}...")
-        return None
+    # Se já é uma URL da API, retornar como está
+    if file_path.startswith('/api/image'):
+        print(f"✅ URL da API reutilizada: {file_path[:50]}...")
+        return file_path 
     
+    # Se é URL externa, retornar como está
+    if file_path.startswith('http'):
+        print(f"✅ URL externa detectada: {file_path[:50]}...")
+        return file_path
+    
+    # Validar se é um caminho de arquivo válido
     try:
         file_obj = Path(file_path)
         if not file_obj.exists() or not file_obj.is_file():
@@ -39,7 +47,6 @@ def create_image_url(file_path: str) -> str:
             return None
             
         # Verificar se é imagem
-        import mimetypes
         mime_type, _ = mimetypes.guess_type(str(file_obj))
         if not mime_type or not mime_type.startswith('image/'):
             print(f"⚠️ Não é imagem: {file_path} (MIME: {mime_type})")
@@ -51,11 +58,9 @@ def create_image_url(file_path: str) -> str:
     
     # Converter caminho absoluto para URL da API
     try:
-        import urllib.parse
-        # Encoding completo para evitar problemas
         encoded_path = urllib.parse.quote(file_path, safe='')
         clean_url = f"/api/image?path={encoded_path}"
-        print(f"✅ URL criada: {file_obj.name} -> URL válida")
+        print(f"✅ URL criada: {file_obj.name} -> {clean_url[:50]}...")
         return clean_url
     except Exception as e:
         print(f"❌ Erro ao criar URL para {file_path}: {e}")
@@ -618,28 +623,55 @@ async def validate_library_path(path: str):
     
 @app.get("/api/image")
 async def serve_image(path: str):
-    """Serve imagens - versão simplificada"""
+    """Serve imagens"""
     try:
-        print(f"🖼️ [IMAGE] Path recebido: {path}")
+        print(f"[IMAGE] Path recebido: {path}")
+        
+        if not CURRENT_LIBRARY_PATH:
+            raise HTTPException(status_code=400, detail="Biblioteca não configurada")
         
         # Decodificar URL
-        import urllib.parse
         decoded_path = urllib.parse.unquote(path)
         print(f"🖼️ [IMAGE] Path decodificado: {decoded_path}")
         
-        # Servir arquivo diretamente
-        file_path = Path(decoded_path)
+        # Detectar e corrigir duplo encoding
+        if "/api/image?path=" in decoded_path:
+            print("🔄 [IMAGE] Corrigindo duplo encoding...")
+            import urllib.parse as urlparse
+            parsed = urlparse.urlparse(decoded_path)
+            if parsed.query:
+                query_params = urlparse.parse_qs(parsed.query)
+                if 'path' in query_params:
+                    decoded_path = query_params['path'][0]
+                    print(f"✅ [IMAGE] Caminho real extraído: {decoded_path}")
+                else:
+                    raise HTTPException(status_code=400, detail="Parâmetro 'path' não encontrado")
         
-        if not file_path.exists():
-            print(f"❌ Arquivo não encontrado: {decoded_path}")
+        # Resolver caminhos absolutos
+        file_path = Path(decoded_path).resolve()
+        library_root = Path(CURRENT_LIBRARY_PATH).resolve()
+        
+        print(f"📁 [IMAGE] Arquivo: {file_path}")
+        print(f"📚 [IMAGE] Biblioteca: {library_root}")
+        
+        # Validar que está dentro da biblioteca
+        if not str(file_path).startswith(str(library_root)):
+            print(f"❌ Path fora da biblioteca: {file_path}")
             raise HTTPException(status_code=404, detail="Arquivo não encontrado")
         
-        print(f"✅ Servindo: {file_path.name}")
+        # Validar que existe e é arquivo
+        if not file_path.exists() or not file_path.is_file():
+            print(f"❌ Arquivo não encontrado: {file_path}")
+            raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        
+        print(f"✅ Servindo imagem: {file_path.name}")
         return FileResponse(path=str(file_path))
         
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"❌ Erro: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Erro inesperado: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
 @app.get("/api/debug")
 async def debug_info():
@@ -665,7 +697,7 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
-# === ENDPOINTS DE CACHE - ADICIONAR AO FINAL DO main.py ===
+# === ENDPOINTS DE CACHE  ===
 
 @app.get("/api/cache/info")
 async def get_cache_info():
