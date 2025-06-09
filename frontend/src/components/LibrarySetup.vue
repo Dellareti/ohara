@@ -201,9 +201,8 @@ export default {
     }
     
     const browseFolder = () => {
-      // Em uma aplicação web real, isso abriria um seletor de arquivos
-      // Por enquanto, vamos dar uma dica ao usuário
-      alert('💡 Digite o caminho da pasta no campo acima.\n\nExemplos:\n• Linux: /home/user/Mangás\n• Windows: C:\\Usuário\\Mangás\n• Mac: /Users/user/Mangás')
+      // TODO
+      alert('Ainda a ser implementado')
     }
     
     const configureLibrary = async () => {

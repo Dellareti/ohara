@@ -177,12 +177,12 @@
       <div v-if="readerStore.showSettings" class="settings-panel" @click.stop>
         <div class="settings-content">
           <div class="settings-header">
-            <h3>⚙️ Configurações de Leitura</h3>
+            <h3>Configurações de Leitura</h3>
             <button @click="closeSettings" class="close-btn">✕</button>
           </div>
           
           <div class="setting-group">
-            <label class="setting-label">📏 Ajuste de Imagem:</label>
+            <label class="setting-label">Ajuste de Imagem:</label>
             <select v-model="readerStore.fitMode" class="setting-select">
               <option value="width">Ajustar Largura</option>
               <option value="height">Ajustar Altura</option>
@@ -192,7 +192,7 @@
           </div>
 
           <div class="setting-group">
-            <label class="setting-label">📖 Direção de Leitura:</label>
+            <label class="setting-label">Direção de Leitura:</label>
             <select v-model="readerStore.readingDirection" class="setting-select">
               <option value="ltr">Esquerda → Direita</option>
               <option value="rtl">Direita → Esquerda</option>
@@ -200,7 +200,7 @@
           </div>
 
           <div class="setting-group">
-            <label class="setting-label">🌙 Tema:</label>
+            <label class="setting-label">Tema:</label>
             <select v-model="readerStore.theme" class="setting-select">
               <option value="dark">Escuro</option>
               <option value="light">Claro</option>
@@ -209,8 +209,8 @@
           </div>
 
           <div class="setting-actions">
-            <button @click="resetSettings" class="secondary-btn">🔄 Redefinir</button>
-            <button @click="applySettings" class="primary-btn">✅ Aplicar</button>
+            <button @click="resetSettings" class="secondary-btn">Redefinir</button>
+            <button @click="applySettings" class="primary-btn">Aplicar</button>
           </div>
         </div>
       </div>
@@ -661,7 +661,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   z-index: 100;
-  transition: transform 0.3s ease;
+  transition: transform 0.5s ease;
 }
 
 .reader-header.hidden {
@@ -909,7 +909,7 @@ export default {
 }
 
 .settings-header h3 {
-  color: #4ecdc4;
+  color: #fff;
   margin: 0;
   font-size: 1.3rem;
   font-weight: 600;
@@ -943,7 +943,7 @@ export default {
   display: block;
   margin-bottom: 0.75rem;
   font-weight: 600;
-  color: #4ecdc4;
+  color: #fff;
   font-size: 1rem;
 }
 

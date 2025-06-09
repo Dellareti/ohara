@@ -4,20 +4,30 @@
     <div class="header">
       <h1>Biblioteca</h1>
       <div class="header-actions">
-        <router-link to="/setup" class="setup-btn">Configuração</router-link>
-        <button @click="refreshLibrary" class="refresh-btn">🔄 Atualizar</button>
+        <!-- Seletor de ordenação -->
+        <select v-model="sortOption" class="sort-select" title="Ordenar por">
+          <option value="alphabetical">📝 A-Z (Padrão)</option>
+          <option value="alphabetical-reverse">📝 Z-A</option>
+          <option value="most-read">👁️ Mais Lidas</option>
+          <option value="least-read">📚 Menos Lidas</option>
+          <option value="chapters-desc">📖 Mais Capítulos</option>
+          <option value="chapters-asc">📖 Menos Capítulos</option>
+          <option value="date-added">🆕 Recém Adicionados</option>
+          <option value="date-modified">🔄 Recém Atualizados</option>
+        </select>
+        <router-link to="/setup" class="setup-btn">Setup</router-link>
+        <button @click="refreshLibrary" class="refresh-btn">Atualizar</button>
       </div>
     </div>
     
-    <!-- Descomentar ou excluir depois -->
     <!-- Stats da biblioteca -->
-    <!-- <div v-if="libraryStore.mangas.length > 0" class="library-stats">
+    <!-- <div v-if="sortedMangas.length > 0" class="library-stats">
       <div class="stat-card">
-        <div class="stat-number">{{ libraryStore.totalMangas }}</div>
+        <div class="stat-number">{{ sortedMangas.length }}</div>
         <div class="stat-label">Mangás</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">{{ libraryStore.totalChapters }}</div>
+        <div class="stat-number">{{ totalChapters }}</div>
         <div class="stat-label">Capítulos</div>
       </div>
       <div class="stat-card">
@@ -46,10 +56,10 @@
       <router-link to="/setup" class="setup-link">⚙️ Configurar Agora</router-link>
     </div>
 
-    <!-- Grid de Mangás -->
-    <div v-if="!libraryStore.loading && !libraryStore.error && libraryStore.mangas.length > 0" class="manga-grid">
+    <!-- Grid de Mangás (usando sortedMangas) -->
+    <div v-if="!libraryStore.loading && !libraryStore.error && sortedMangas.length > 0" class="manga-grid">
       <div 
-        v-for="manga in libraryStore.mangas" 
+        v-for="manga in sortedMangas" 
         :key="manga.id"
         class="manga-card"
         @click="selectManga(manga)"
@@ -87,7 +97,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/store/library'
 
@@ -96,11 +106,129 @@ export default {
   setup() {
     const router = useRouter()
     const libraryStore = useLibraryStore()
-    const testResult = ref('')
+    const sortOption = ref('alphabetical')
 
-    // Computed
+    // Função de ordenação natural (números antes de letras, mas mantendo ordem lógica)
+    const naturalSort = (a, b) => {
+      const aTitle = a.title.toLowerCase()
+      const bTitle = b.title.toLowerCase()
+      
+      // Separar em partes numéricas e alfabéticas
+      const aParts = aTitle.match(/(\d+|\D+)/g) || []
+      const bParts = bTitle.match(/(\d+|\D+)/g) || []
+      
+      const maxLength = Math.max(aParts.length, bParts.length)
+      
+      for (let i = 0; i < maxLength; i++) {
+        const aPart = aParts[i] || ''
+        const bPart = bParts[i] || ''
+        
+        // Se ambos são números, comparar numericamente
+        if (!isNaN(aPart) && !isNaN(bPart)) {
+          const diff = parseInt(aPart) - parseInt(bPart)
+          if (diff !== 0) return diff
+        }
+        // Se um é número e outro não, número vem primeiro
+        else if (!isNaN(aPart) && isNaN(bPart)) {
+          return -1
+        }
+        else if (isNaN(aPart) && !isNaN(bPart)) {
+          return 1
+        }
+        // Ambos são strings, comparar alfabeticamente
+        else {
+          const diff = aPart.localeCompare(bPart)
+          if (diff !== 0) return diff
+        }
+      }
+      
+      return 0
+    }
+
+    // Computed para mangás ordenados
+    const sortedMangas = computed(() => {
+      const mangas = [...libraryStore.mangas]
+      
+      switch (sortOption.value) {
+        case 'alphabetical':
+          return mangas.sort(naturalSort)
+        
+        case 'alphabetical-reverse':
+          return mangas.sort((a, b) => -naturalSort(a, b))
+        
+        case 'most-read':
+          return mangas.sort((a, b) => {
+            // Ordenar por progresso de leitura (capítulos lidos)
+            const aProgress = a.reading_progress?.chapters_read || 0
+            const bProgress = b.reading_progress?.chapters_read || 0
+            if (aProgress !== bProgress) {
+              return bProgress - aProgress // Mais lidas primeiro
+            }
+            // Se empate, ordenar por páginas lidas
+            const aPages = a.reading_progress?.pages_read || 0
+            const bPages = b.reading_progress?.pages_read || 0
+            if (aPages !== bPages) {
+              return bPages - aPages
+            }
+            // Se ainda empate, ordenar alfabeticamente
+            return naturalSort(a, b)
+          })
+        
+        case 'least-read':
+          return mangas.sort((a, b) => {
+            const aProgress = a.reading_progress?.chapters_read || 0
+            const bProgress = b.reading_progress?.chapters_read || 0
+            if (aProgress !== bProgress) {
+              return aProgress - bProgress // Menos lidas primeiro
+            }
+            const aPages = a.reading_progress?.pages_read || 0
+            const bPages = b.reading_progress?.pages_read || 0
+            if (aPages !== bPages) {
+              return aPages - bPages
+            }
+            return naturalSort(a, b)
+          })
+        
+        case 'chapters-desc':
+          return mangas.sort((a, b) => {
+            const diff = (b.chapter_count || 0) - (a.chapter_count || 0)
+            return diff !== 0 ? diff : naturalSort(a, b)
+          })
+        
+        case 'chapters-asc':
+          return mangas.sort((a, b) => {
+            const diff = (a.chapter_count || 0) - (b.chapter_count || 0)
+            return diff !== 0 ? diff : naturalSort(a, b)
+          })
+        
+        case 'date-added':
+          return mangas.sort((a, b) => {
+            const dateA = new Date(a.date_added || 0)
+            const dateB = new Date(b.date_added || 0)
+            const diff = dateB - dateA // Mais recentes primeiro
+            return diff !== 0 ? diff : naturalSort(a, b)
+          })
+        
+        case 'date-modified':
+          return mangas.sort((a, b) => {
+            const dateA = new Date(a.date_modified || 0)
+            const dateB = new Date(b.date_modified || 0)
+            const diff = dateB - dateA // Mais recentes primeiro
+            return diff !== 0 ? diff : naturalSort(a, b)
+          })
+        
+        default:
+          return mangas.sort(naturalSort) // Padrão: alfabética
+      }
+    })
+
+    // Computed para estatísticas
     const totalPages = computed(() => {
-      return libraryStore.mangas.reduce((sum, manga) => sum + (manga.total_pages || 0), 0)
+      return sortedMangas.value.reduce((sum, manga) => sum + (manga.total_pages || 0), 0)
+    })
+
+    const totalChapters = computed(() => {
+      return sortedMangas.value.reduce((sum, manga) => sum + (manga.chapter_count || 0), 0)
     })
 
     // Methods
@@ -127,7 +255,6 @@ export default {
     const selectManga = (manga) => {
       console.log('📖 Mangá selecionado:', manga.title)
       
-      // Navegar para página de detalhes
       router.push({
         name: 'MangaDetail',
         params: { id: manga.id }
@@ -137,7 +264,6 @@ export default {
     const getThumbnailUrl = (thumbnailPath) => {
       if (!thumbnailPath) return null
       
-      // Se for um caminho absoluto, converter para URL da API
       if (thumbnailPath.startsWith('/')) {
         return `http://localhost:8000/api/image?path=${encodeURIComponent(thumbnailPath)}`
       }
@@ -146,7 +272,6 @@ export default {
     }
 
     const onImageError = (event) => {
-      // Esconder imagem quebrada e mostrar placeholder
       event.target.style.display = 'none'
       event.target.parentElement.innerHTML = '<div class="placeholder-thumbnail">📖</div>'
     }
@@ -158,34 +283,29 @@ export default {
       return pages.toString()
     }
 
-    const testBackend = async () => {
-      try {
-        console.log('🔄 Testando backend...')
-        const response = await fetch('http://localhost:8000/api/test')
-        const data = await response.json()
-        testResult.value = JSON.stringify(data, null, 2)
-        console.log('✅ Backend funcionando:', data)
-      } catch (error) {
-        testResult.value = `❌ Erro: ${error.message}`
-        console.error('❌ Erro ao testar backend:', error)
+    // Salvar preferência de ordenação
+    const saveSortPreference = () => {
+      localStorage.setItem('manga-library-sort', sortOption.value)
+    }
+
+    // Carregar preferência de ordenação
+    const loadSortPreference = () => {
+      const saved = localStorage.getItem('manga-library-sort')
+      if (saved) {
+        sortOption.value = saved
       }
     }
 
-    const loadMockData = async () => {
-      try {
-        await libraryStore.loadMockData()
-        console.log('✅ Dados mock carregados')
-      } catch (error) {
-        console.error('❌ Erro ao carregar mock:', error)
-      }
-    }
+    // Watch para salvar preferência quando mudar
+    watch(sortOption, () => {
+      saveSortPreference()
+    })
 
     // Lifecycle
     onMounted(async () => {
-      // Recuperar configuração salva
+      loadSortPreference()
       libraryStore.loadSavedConfiguration()
       
-      // Carregar biblioteca se já configurada
       if (libraryStore.libraryPath) {
         await refreshLibrary()
       } else {
@@ -195,16 +315,16 @@ export default {
 
     return {
       libraryStore,
-      testResult,
+      sortOption,
+      sortedMangas,
       totalPages,
+      totalChapters,
       loadLibrary,
       refreshLibrary,
       selectManga,
       getThumbnailUrl,
       onImageError,
-      formatPages,
-      testBackend,
-      loadMockData
+      formatPages
     }
   }
 }
@@ -231,7 +351,7 @@ export default {
 .header h1 {
   font-size: 2.5rem;
   margin: 0;
-  background: #fff;
+  background:#fff;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -239,6 +359,22 @@ export default {
 .header-actions {
   display: flex;
   gap: 15px;
+  align-items: center;
+}
+
+.sort-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.sort-select option {
+  background: #1e1e2e;
+  color: white;
 }
 
 .setup-btn,
@@ -250,6 +386,7 @@ export default {
   cursor: pointer;
   text-decoration: none;
   transition: all 0.3s ease;
+  font-size: 0.9rem;
 }
 
 .setup-btn {
@@ -258,9 +395,18 @@ export default {
 }
 
 .refresh-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  color: #4ecdc4;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 1rem;
+  min-width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .setup-btn:hover,
@@ -287,7 +433,7 @@ export default {
 .stat-number {
   font-size: 2rem;
   font-weight: bold;
-  color: #fff;
+  color: #4ecdc4;
 }
 
 .stat-label {
@@ -425,7 +571,7 @@ export default {
 
 .chapter-count {
   font-weight: bold;
-  color: #fff;
+  color: #4ecdc4;
 }
 
 .author {
@@ -464,55 +610,6 @@ export default {
   opacity: 0.8;
 }
 
-.test-section {
-  margin: 30px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 15px;
-  padding: 20px;
-}
-
-.test-section summary {
-  cursor: pointer;
-  font-weight: bold;
-  padding: 10px 0;
-}
-
-.test-content {
-  padding-top: 15px;
-}
-
-.test-btn {
-  background: linear-gradient(45deg, #ff9f43, #ff7675);
-  border: none;
-  padding: 10px 20px;
-  border-radius: 10px;
-  color: white;
-  cursor: pointer;
-  margin-right: 10px;
-  margin-bottom: 10px;
-}
-
-.test-btn:hover {
-  transform: translateY(-2px);
-}
-
-.result {
-  margin-top: 15px;
-  padding: 15px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 10px;
-  border-left: 4px solid #4ecdc4;
-}
-
-.result pre {
-  background: rgba(0, 0, 0, 0.7);
-  padding: 10px;
-  border-radius: 5px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  font-size: 0.8rem;
-}
-
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
@@ -522,6 +619,11 @@ export default {
   
   .header h1 {
     font-size: 2rem;
+  }
+  
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: center;
   }
   
   .library-stats {

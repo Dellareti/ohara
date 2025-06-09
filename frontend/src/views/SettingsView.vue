@@ -3,6 +3,8 @@
     <div class="settings-header">
       <h1>Configurações do Sistema</h1>
       <p>Personalize sua experiência de leitura e configurações gerais</p>
+      <br>
+      <p>(Em Implementação)</p>
     </div>
 
     <div class="settings-content">

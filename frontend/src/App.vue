@@ -27,7 +27,7 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>Ohara Manga Reader - Preserve suas histórias favoritas</p>
+      <p>Ohara Manga Reader - Leia suas histórias favoritas</p>
     </footer>
   </div>
 </template>
@@ -86,6 +86,28 @@ export default {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
   flex-direction: column;
+}
+
+body:has(.manga-reader) .app-header,
+body:has(.manga-reader) .app-footer {
+  display: none !important;
+}
+
+.manga-reader ~ * .app-header,
+.manga-reader ~ * .app-footer,
+.manga-reader + * .app-header,
+.manga-reader + * .app-footer {
+  display: none !important;
+}
+
+/* Quando a página é de leitura, remover padding do main */
+body:has(.manga-reader) .app-main {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Header */

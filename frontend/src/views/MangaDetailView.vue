@@ -96,12 +96,12 @@
             
             <!-- Refresh Button -->
             <button @click="refreshChapters" class="refresh-btn" title="Atualizar capítulos">
-              🔄
+              Atualizar capítulos
             </button>
             
             <select v-model="sortOrder" class="sort-select">
-              <option value="desc">🔽 Mais Recente Primeiro</option>
-              <option value="asc">🔼 Mais Antigo Primeiro</option>
+              <option value="desc">Mais Recente Primeiro</option>
+              <option value="asc">Mais Antigo Primeiro</option>
             </select>
           </div>
         </div>
@@ -134,7 +134,7 @@
               <div class="chapter-title">{{ chapter.name }}</div>
               <div class="chapter-meta">
                 <span v-if="chapter.number" class="chapter-number">
-                  Cap. {{ chapter.number }}
+                Capítulo {{ chapter.number }}
                 </span>
                 <span v-if="chapter.volume" class="volume-number">
                   Vol. {{ chapter.volume }}
@@ -378,14 +378,9 @@ export default {
     }
 
     const continueReading = () => {
-      if (!manga.value?.chapters?.length) return
-      
-      let nextChapter = manga.value.chapters.find(ch => !ch.isRead)
-      if (!nextChapter) {
-        nextChapter = manga.value.chapters[0]
-      }
-      
-      openChapter(nextChapter)
+      // TODO
+      alert('Ainda a ser implementado')
+
     }
 
     const openChapter = (chapter) => {
