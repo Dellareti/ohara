@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // Importar views
-const LibraryView = () => import('@/views/LibraryView.vue')
 const LibraryViewSimple = () => import('@/views/LibraryViewSimple.vue')
 const MangaDetailView = () => import('@/views/MangaDetailView.vue')
 const MangaReaderView = () => import('@/views/MangaReaderView.vue')
@@ -22,14 +21,6 @@ const routes = [
     component: LibraryViewSimple,
     meta: {
       title: 'Biblioteca - Ohara'
-    }
-  },
-  {
-    path: '/library-full',
-    name: 'LibraryFull', 
-    component: LibraryView,
-    meta: {
-      title: 'Biblioteca Completa - Ohara'
     }
   },
   {

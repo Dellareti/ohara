@@ -12,7 +12,6 @@
         
         <div class="nav-links">
           <router-link to="/" class="nav-link">Biblioteca</router-link>
-          <router-link to="/library-full" class="nav-link">Versão Completa</router-link>
           <router-link to="/setup" class="nav-link">Setup</router-link>
           <router-link to="/settings" class="nav-link">Configurações</router-link>
         </div>
