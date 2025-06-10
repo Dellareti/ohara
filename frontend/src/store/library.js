@@ -104,13 +104,13 @@ export const useLibraryStore = defineStore('library', {
       this.error = null
       
       try {
-        // ✅ CORREÇÃO: Usar POST com FormData como seu backend espera
+        // Usar POST com FormData como seu backend espera
         const formData = new FormData()
         formData.append('library_path', this.libraryPath)
         
         const response = await fetch('http://localhost:8000/api/scan-library', {
-          method: 'POST',  // ✅ POST (não GET)
-          body: formData   // ✅ FormData (não query params)
+          method: 'POST',  // POST
+          body: formData   // FormData (não query params)
         })
         
         if (!response.ok) {
@@ -427,39 +427,6 @@ export const useLibraryStore = defineStore('library', {
       } catch (error) {
         console.error('❌ Erro ao configurar biblioteca:', error)
         throw error
-      }
-    },
-
-    async scanLibrary() {
-      if (!this.libraryPath) {
-        throw new Error('Caminho da biblioteca não configurado')
-      }
-      
-      console.log('🔍 Escaneando biblioteca:', this.libraryPath)
-      this.loading = true
-      this.error = null
-      
-      try {
-        const response = await fetch(`http://localhost:8000/api/scan-library?path=${encodeURIComponent(this.libraryPath)}`)
-        const data = await response.json()
-        
-        if (data.library) {
-          this.mangas = data.library.mangas || []
-          this.totalMangas = data.library.total_mangas || this.mangas.length
-          this.totalChapters = data.library.total_chapters || 0
-          
-          console.log(`📚 Biblioteca escaneada: ${this.mangas.length} mangás`)
-          return true
-        } else {
-          throw new Error(data.message || 'Erro ao escanear biblioteca')
-        }
-        
-      } catch (error) {
-        console.error('❌ Erro no scan:', error)
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
       }
     },
 
