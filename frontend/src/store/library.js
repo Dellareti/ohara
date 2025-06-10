@@ -18,7 +18,6 @@ export const useLibraryStore = defineStore('library', {
     error: null,
     
     // Configurações
-    isMockData: true,
     backendOnline: false,
     
     // Cache control
@@ -58,6 +57,11 @@ export const useLibraryStore = defineStore('library', {
     isCacheValid: (state) => {
       if (!state.lastLoadTime) return false
       return (Date.now() - state.lastLoadTime) < state.cacheTimeout
+    },
+    
+    // Verificar se biblioteca está configurada
+    isLibraryConfigured: (state) => {
+      return state.libraryPath && state.libraryPath.trim().length > 0
     }
   },
 
@@ -94,6 +98,7 @@ export const useLibraryStore = defineStore('library', {
       }
     },
 
+    // Escanear biblioteca
     async scanLibrary() {
       if (!this.libraryPath) {
         throw new Error('Caminho da biblioteca não configurado')
@@ -101,16 +106,17 @@ export const useLibraryStore = defineStore('library', {
       
       console.log('🔍 Escaneando biblioteca:', this.libraryPath)
       this.loading = true
+      this.scanning = true
       this.error = null
       
       try {
-        // Usar POST com FormData como seu backend espera
+        // Usar POST com FormData como o backend espera
         const formData = new FormData()
         formData.append('library_path', this.libraryPath)
         
         const response = await fetch('http://localhost:8000/api/scan-library', {
-          method: 'POST',  // POST
-          body: formData   // FormData (não query params)
+          method: 'POST',
+          body: formData
         })
         
         if (!response.ok) {
@@ -124,6 +130,11 @@ export const useLibraryStore = defineStore('library', {
           this.totalMangas = data.library.total_mangas || this.mangas.length
           this.totalChapters = data.library.total_chapters || 0
           this.totalPages = data.library.total_pages || 0
+          this.lastUpdated = new Date(data.library.last_updated || Date.now())
+          this.lastLoadTime = Date.now()
+          
+          // Salvar configuração no localStorage
+          this.saveLibraryConfig()
           
           console.log(`📚 Biblioteca escaneada: ${this.mangas.length} mangás`)
           console.log('📊 Response message:', data.message)
@@ -138,6 +149,7 @@ export const useLibraryStore = defineStore('library', {
         throw error
       } finally {
         this.loading = false
+        this.scanning = false
       }
     },
 
@@ -146,7 +158,7 @@ export const useLibraryStore = defineStore('library', {
       // Se já foi inicializado e cache é válido, não recarregar
       if (this.isInitialized && !forceRefresh && this.isCacheValid && this.mangas.length > 0) {
         console.log('📋 Cache válido, usando dados em memória')
-        return { mangas: this.mangas, is_mock: this.isMockData }
+        return { mangas: this.mangas }
       }
       
       if (this.scanning) return // Evitar chamadas simultâneas
@@ -165,7 +177,6 @@ export const useLibraryStore = defineStore('library', {
         this.totalMangas = data.total_mangas || data.mangas?.length || 0
         this.totalChapters = data.total_chapters || 0
         this.totalPages = data.total_pages || 0
-        this.isMockData = data.is_mock === true
         this.lastLoadTime = Date.now()
         this.isInitialized = true
         
@@ -177,14 +188,13 @@ export const useLibraryStore = defineStore('library', {
           this.libraryPath = data.scanned_path
         }
         
-        // Salvar cache se são dados reais
-        if (!this.isMockData) {
+        // Salvar cache se há dados reais
+        if (this.mangas.length > 0) {
           this.saveLibraryConfig()
         }
         
         console.log('✅ Biblioteca carregada:', {
           mangas: this.totalMangas,
-          isMock: this.isMockData,
           fromCache: false
         })
         
@@ -227,7 +237,14 @@ export const useLibraryStore = defineStore('library', {
     // Atualizar biblioteca atual (força refresh)
     async refreshLibrary() {
       console.log('🔄 Forçando atualização da biblioteca...')
-      return await this.fetchLibrary(true)
+      
+      if (this.libraryPath) {
+        // Se tem biblioteca configurada, fazer scan
+        return await this.scanLibrary()
+      } else {
+        // Se não tem biblioteca, tentar carregar do servidor
+        return await this.fetchLibrary(true)
+      }
     },
 
     // Buscar mangás
@@ -239,11 +256,12 @@ export const useLibraryStore = defineStore('library', {
       const searchTerm = query.toLowerCase().trim()
       return this.mangas.filter(manga => 
         manga.title.toLowerCase().includes(searchTerm) ||
-        manga.id.toLowerCase().includes(searchTerm)
+        manga.id.toLowerCase().includes(searchTerm) ||
+        (manga.author && manga.author.toLowerCase().includes(searchTerm))
       )
     },
 
-    // Limpar biblioteca - CORRIGIDO
+    // Limpar biblioteca completamente
     async clearLibrary() {
       console.log('🗑️ Limpando biblioteca completamente...')
       
@@ -257,7 +275,6 @@ export const useLibraryStore = defineStore('library', {
       this.lastUpdated = null
       this.lastLoadTime = null
       this.isInitialized = false
-      this.isMockData = true
       this.error = null
       
       // 2. Limpar localStorage
@@ -269,53 +286,109 @@ export const useLibraryStore = defineStore('library', {
       console.log('✅ Biblioteca limpa completamente')
     },
 
+    // Configurar caminho da biblioteca
+    async setLibraryPath(path) {
+      console.log('📁 Configurando caminho da biblioteca:', path)
+      
+      try {
+        // Validar caminho primeiro
+        const validation = await this.validatePath(path)
+        if (!validation.valid) {
+          throw new Error(validation.message)
+        }
+        
+        // Configurar no backend
+        const response = await fetch('http://localhost:8000/api/set-library-path', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path })
+        })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        
+        if (data.success) {
+          this.libraryPath = path
+          this.isInitialized = true
+          
+          // Salvar no localStorage
+          this.saveLibraryConfig()
+          
+          console.log('✅ Biblioteca configurada:', data.message)
+          return true
+        } else {
+          throw new Error(data.message)
+        }
+        
+      } catch (error) {
+        console.error('❌ Erro ao configurar biblioteca:', error)
+        throw error
+      }
+    },
+
     // Salvar configuração no localStorage
     saveLibraryConfig() {
-      if (this.libraryPath) {
-        localStorage.setItem('ohara_library_path', this.libraryPath)
-        localStorage.setItem('ohara_last_load', this.lastLoadTime?.toString() || '')
-        localStorage.setItem('ohara_last_updated', this.lastUpdated?.toISOString() || '')
-        console.log('💾 Configuração salva no localStorage')
+      try {
+        if (this.libraryPath) {
+          localStorage.setItem('ohara_library_path', this.libraryPath)
+          localStorage.setItem('ohara_last_load', this.lastLoadTime?.toString() || '')
+          localStorage.setItem('ohara_last_updated', this.lastUpdated?.toISOString() || '')
+          console.log('💾 Configuração salva no localStorage')
+        }
+      } catch (error) {
+        console.warn('⚠️ Erro ao salvar no localStorage:', error)
       }
     },
 
     // Carregar configuração do localStorage
     loadLibraryConfig() {
-      const savedPath = localStorage.getItem('ohara_library_path')
-      const savedLastLoad = localStorage.getItem('ohara_last_load')
-      const savedLastUpdated = localStorage.getItem('ohara_last_updated')
-      
-      if (savedPath) {
-        this.libraryPath = savedPath
-        if (savedLastLoad) {
-          this.lastLoadTime = parseInt(savedLastLoad)
+      try {
+        const savedPath = localStorage.getItem('ohara_library_path')
+        const savedLastLoad = localStorage.getItem('ohara_last_load')
+        const savedLastUpdated = localStorage.getItem('ohara_last_updated')
+        
+        if (savedPath) {
+          this.libraryPath = savedPath
+          if (savedLastLoad) {
+            this.lastLoadTime = parseInt(savedLastLoad)
+          }
+          if (savedLastUpdated) {
+            this.lastUpdated = new Date(savedLastUpdated)
+          }
+          console.log('📂 Configuração carregada do localStorage:', savedPath)
+          return savedPath
         }
-        if (savedLastUpdated) {
-          this.lastUpdated = new Date(savedLastUpdated)
-        }
-        console.log('📂 Configuração carregada do localStorage:', savedPath)
-        return savedPath
+      } catch (error) {
+        console.warn('⚠️ Erro ao carregar do localStorage:', error)
       }
       
       return null
     },
 
-    // Limpar configuração do localStorage - MELHORADO
+    // Limpar configuração do localStorage
     clearLibraryConfig() {
-      // Remover todas as chaves relacionadas ao Ohara
-      const keysToRemove = [
-        'ohara_library_path',
-        'ohara_last_load', 
-        'ohara_last_updated',
-        'ohara_mangas_cache',
-        'ohara_settings'
-      ]
-      
-      keysToRemove.forEach(key => {
-        localStorage.removeItem(key)
-      })
-      
-      console.log('🗑️ Configuração limpa do localStorage')
+      try {
+        const keysToRemove = [
+          'ohara_library_path',
+          'ohara_last_load', 
+          'ohara_last_updated',
+          'ohara_mangas_cache',
+          'ohara_settings'
+        ]
+        
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key)
+        })
+        
+        console.log('🗑️ Configuração limpa do localStorage')
+      } catch (error) {
+        console.warn('⚠️ Erro ao limpar localStorage:', error)
+      }
     },
 
     // Inicializar store (chamado uma vez)
@@ -346,20 +419,22 @@ export const useLibraryStore = defineStore('library', {
         return
       }
       
-      // Tentar carregar biblioteca atual (real ou mock)
+      // Tentar carregar biblioteca atual
       try {
         await this.fetchLibrary()
         
-        // Se carregou dados mock e tem caminho salvo, tentar reescanear
-        if (this.isMockData && savedPath) {
+        // Se carregou biblioteca vazia e tem caminho salvo, tentar reescanear
+        if (this.mangas.length === 0 && savedPath) {
           console.log('📂 Tentando reescanear biblioteca salva:', savedPath)
           try {
-            await this.scanLibrary(savedPath)
+            await this.scanLibrary()
           } catch (error) {
             console.warn('⚠️ Erro ao reescanear biblioteca salva:', error)
             this.clearLibraryConfig()
           }
         }
+        
+        this.isInitialized = true
       } catch (error) {
         console.error('❌ Erro na inicialização:', error)
         this.error = 'Erro ao inicializar biblioteca'
@@ -393,108 +468,29 @@ export const useLibraryStore = defineStore('library', {
       }
     },
 
-    async setLibraryPath(path) {
-      console.log('📁 Configurando caminho da biblioteca:', path)
-      
+    // Preview dos mangás que seriam encontrados
+    async previewLibrary(path) {
       try {
-        const response = await fetch('http://localhost:8000/api/set-library-path', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ path })
-        })
+        console.log('Fazendo preview da biblioteca:', path)
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-        
+        const response = await fetch(`http://localhost:8000/api/preview-library?path=${encodeURIComponent(path)}`)
         const data = await response.json()
         
-        if (data.success) {
-          this.libraryPath = path
-          this.isInitialized = true
-          
-          // Salvar no localStorage
-          localStorage.setItem('ohara_library_path', path)
-          
-          console.log('✅ Biblioteca configurada:', data.message)
-          return true
-        } else {
-          throw new Error(data.message)
+        return {
+          valid: data.valid,
+          mangas: data.mangas || [],
+          totalFound: data.total_found || 0,
+          message: data.message
         }
         
       } catch (error) {
-        console.error('❌ Erro ao configurar biblioteca:', error)
-        throw error
-      }
-    },
-
-    async loadMockData() {
-      console.log('🧪 Carregando dados de exemplo...')
-      this.loading = true
-      
-      try {
-        // Simular dados mock
-        this.mangas = [
-          {
-            id: 'one-piece',
-            title: 'One Piece',
-            path: '/mock/one-piece',
-            thumbnail: null,
-            chapter_count: 1095,
-            total_pages: 20000,
-            author: 'Eiichiro Oda',
-            status: 'Ongoing',
-            genres: ['Action', 'Adventure', 'Shounen']
-          },
-          {
-            id: 'naruto',
-            title: 'Naruto',
-            path: '/mock/naruto',
-            thumbnail: null,
-            chapter_count: 700,
-            total_pages: 15000,
-            author: 'Masashi Kishimoto',
-            status: 'Completed',
-            genres: ['Action', 'Martial Arts', 'Shounen']
-          },
-          {
-            id: 'solo-leveling',
-            title: 'Solo Leveling',
-            path: '/mock/solo-leveling',
-            thumbnail: null,
-            chapter_count: 179,
-            total_pages: 4000,
-            author: 'Chugong',
-            status: 'Completed',
-            genres: ['Action', 'Fantasy', 'Webtoon']
-          }
-        ]
-        
-        this.totalMangas = this.mangas.length
-        this.totalChapters = this.mangas.reduce((sum, manga) => sum + manga.chapter_count, 0)
-        this.libraryPath = '/mock/biblioteca'
-        this.isInitialized = true
-        
-        console.log('✅ Dados mock carregados')
-        return true
-        
-      } catch (error) {
-        console.error('❌ Erro ao carregar mock:', error)
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    // Método para recuperar configuração salva
-    loadSavedConfiguration() {
-      const savedPath = localStorage.getItem('ohara_library_path')
-      if (savedPath) {
-        this.libraryPath = savedPath
-        this.isInitialized = true
-        console.log('📁 Configuração recuperada:', savedPath)
+        console.error('❌ Erro no preview:', error)
+        return {
+          valid: false,
+          mangas: [],
+          totalFound: 0,
+          message: apiUtils.formatError(error)
+        }
       }
     }
   }

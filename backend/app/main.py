@@ -446,7 +446,7 @@ async def scan_library_get(path: str):
 @app.get("/api/library")
 async def get_library():
     """
-    Retorna a biblioteca atual (escaneada ou dados mock)
+    Retorna a biblioteca atual 
     """
     global CURRENT_LIBRARY_PATH
     
@@ -458,7 +458,7 @@ async def get_library():
             # Criar resposta otimizada COM thumbnails funcionais
             optimized_mangas = []
             for manga in library.mangas:
-                # ✅ CORREÇÃO: Verificar se thumbnail existe antes de criar URL
+                # Verificar se thumbnail existe antes de criar URL
                 thumbnail_url = None
                 if manga.thumbnail:
                     thumbnail_url = create_image_url(manga.thumbnail)
@@ -474,7 +474,7 @@ async def get_library():
                     "title": manga.title,
                     "chapter_count": manga.chapter_count,
                     "total_pages": manga.total_pages,
-                    "thumbnail": thumbnail_url,  # ✅ CORRIGIDO: URL ou None
+                    "thumbnail": thumbnail_url,  
                     "path": manga.path
                 }
                 optimized_mangas.append(optimized_manga)
@@ -487,50 +487,24 @@ async def get_library():
                 "message": f"Biblioteca com {library.total_mangas} mangás",
                 "scanned_path": CURRENT_LIBRARY_PATH,
                 "last_updated": library.last_updated.isoformat(),
-                "is_mock": False
             }
             
             return JSONResponse(content=jsonable_encoder(response_data))
             
         except Exception as e:
             print(f"❌ Erro ao recarregar biblioteca: {str(e)}")
-            # Se falhar, limpar caminho e usar mock
+            # Se falhar, limpar caminho
             CURRENT_LIBRARY_PATH = None
             clear_library_path()
     
-    # Mock data (inalterado)
-    mock_library = {
-        "mangas": [
-            {
-                "id": "one-piece",
-                "title": "One Piece",
-                "chapter_count": 1095,
-                "thumbnail": None,
-                "last_chapter": "Capítulo 1095",
-                "path": "/mock/One Piece"
-            },
-            {
-                "id": "naruto",
-                "title": "Naruto", 
-                "chapter_count": 700,
-                "thumbnail": None,
-                "last_chapter": "Capítulo 700",
-                "path": "/mock/Naruto"
-            },
-            {
-                "id": "attack-on-titan",
-                "title": "Attack on Titan",
-                "chapter_count": 139,
-                "thumbnail": None,
-                "last_chapter": "Capítulo 139",
-                "path": "/mock/Attack on Titan"
-            }
-        ],
-        "total_mangas": 3,
-        "message": "📚 Configure uma biblioteca real para começar",
-        "is_mock": True
-    }
-    return JSONResponse(content=mock_library)
+    # Se não há biblioteca, retornar biblioteca vazia
+    return JSONResponse(content={
+        "mangas": [],
+        "total_mangas": 0,
+        "total_chapters": 0,
+        "total_pages": 0,
+        "message": "📚 Configure uma biblioteca para começar",
+    })
 
 @app.get("/api/manga/{manga_id}")
 async def get_manga(manga_id: str):
@@ -539,24 +513,12 @@ async def get_manga(manga_id: str):
     """
     global CURRENT_LIBRARY_PATH
     
-    # Se não há biblioteca escaneada, retornar dados mock
+    # Se não há biblioteca configurada, retornar erro
     if CURRENT_LIBRARY_PATH is None:
-        mock_manga = {
-            "id": manga_id,
-            "title": manga_id.replace("-", " ").title(),
-            "chapters": [
-                {"id": f"{manga_id}-ch-5", "name": "Capítulo 5", "number": 5, "pages": 20},
-                {"id": f"{manga_id}-ch-4", "name": "Capítulo 4", "number": 4, "pages": 18},
-                {"id": f"{manga_id}-ch-3", "name": "Capítulo 3", "number": 3, "pages": 22},
-                {"id": f"{manga_id}-ch-2", "name": "Capítulo 2", "number": 2, "pages": 19},
-                {"id": f"{manga_id}-ch-1", "name": "Capítulo 1", "number": 1, "pages": 25}
-            ],
-            "thumbnail": None,
-            "chapter_count": 5,
-            "message": f"Dados mock para {manga_id} - Escaneie uma biblioteca real",
-            "is_mock": True
-        }
-        return JSONResponse(content=mock_manga)
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma biblioteca configurada. Configure uma biblioteca primeiro."
+        )
     
     # Buscar mangá real na biblioteca escaneada
     try:
@@ -580,7 +542,6 @@ async def get_manga(manga_id: str):
         response_data = {
             "manga": jsonable_encoder(manga.model_dump()),
             "message": f"Detalhes do mangá '{manga.title}' carregados",
-            "is_mock": False
         }
         
         return JSONResponse(content=jsonable_encoder(response_data))
@@ -974,38 +935,13 @@ async def get_manga_detail(manga_id: str):
     global CURRENT_LIBRARY_PATH
     
     if not CURRENT_LIBRARY_PATH:
-        # Retornar dados mock se não há biblioteca configurada
-        mock_manga = {
-            "id": manga_id,
-            "title": manga_id.replace("-", " ").title(),
-            "path": f"/mock/{manga_id}",
-            "thumbnail": None,
-            "chapter_count": 5,
-            "total_pages": 100,
-            "author": "Autor Exemplo",
-            "status": "Ongoing",
-            "genres": ["Action", "Adventure"],
-            "description": f"Descrição mock para {manga_id}",
-            "chapters": [
-                {
-                    "id": f"{manga_id}-ch-{i}",
-                    "name": f"Capítulo {i}",
-                    "number": i,
-                    "page_count": 20,
-                    "date_added": "2024-01-01T00:00:00",
-                    "thumbnail_url": None
-                }
-                for i in range(5, 0, -1)  # Capítulos em ordem decrescente
-            ],
-            "is_mock": True
-        }
-        
-        return JSONResponse(content={
-            "manga": mock_manga,
-            "message": "Dados mock - Configure uma biblioteca real",
-            "is_mock": True
-        })
-    
+        # Se não há biblioteca configurada, retornar erro
+        if CURRENT_LIBRARY_PATH is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhuma biblioteca configurada. Configure uma biblioteca primeiro."
+            )
+
     try:
         # Escanear biblioteca real
         library = scanner.scan_library(CURRENT_LIBRARY_PATH)
@@ -1049,7 +985,6 @@ async def get_manga_detail(manga_id: str):
         return JSONResponse(content={
             "manga": manga_data,
             "message": f"Detalhes do mangá '{manga.title}' carregados",
-            "is_mock": False
         })
         
     except HTTPException:

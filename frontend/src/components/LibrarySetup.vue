@@ -238,7 +238,6 @@ export default {
           libraryStore.totalChapters = data.library.total_chapters || 0
           libraryStore.totalPages = data.library.total_pages || 0
           libraryStore.isInitialized = true
-          libraryStore.isMockData = false
           
           console.log('✅ Biblioteca configurada e escaneada:', data.message)
           
