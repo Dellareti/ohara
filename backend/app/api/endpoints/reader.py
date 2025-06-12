@@ -11,6 +11,30 @@ from datetime import datetime
 from app.core.services.manga_scanner import MangaScanner
 from app.models.manga import Chapter, Page
 
+def chapter_to_dict(chapter) -> dict:
+    """
+    Converte um objeto Chapter para dict com serialização adequada de datetime
+    """
+    return {
+        "id": chapter.id,
+        "name": chapter.name,
+        "number": chapter.number,
+        "volume": chapter.volume,
+        "path": chapter.path,
+        "page_count": chapter.page_count,
+        "date_added": chapter.date_added.isoformat() if chapter.date_added else None,
+        "pages": [
+            {
+                "filename": page.filename,
+                "path": page.path,
+                "size": page.size,
+                "width": page.width,
+                "height": page.height
+            }
+            for page in chapter.pages
+        ]
+    }
+
 router = APIRouter()
 scanner = MangaScanner()
 
@@ -87,10 +111,9 @@ async def get_chapter(manga_id: str, chapter_id: str):
     Retorna dados completos de um capítulo específico
     ✅ CORRIGIDO: Aceita múltiplos formatos de chapter_id
     """
-    global CURRENT_LIBRARY_PATH
-    from app.main import CURRENT_LIBRARY_PATH
+    from app.core.library_state import library_state
     
-    if not CURRENT_LIBRARY_PATH:
+    if not library_state.current_path:
         raise HTTPException(
             status_code=400,
             detail="Nenhuma biblioteca configurada"
@@ -106,7 +129,7 @@ async def get_chapter(manga_id: str, chapter_id: str):
             return _chapter_cache[cache_key]
         
         # Escanear biblioteca para encontrar o capítulo
-        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        library = scanner.scan_library(library_state.current_path)
         manga = library.get_manga(manga_id)
         
         if not manga:
@@ -134,7 +157,7 @@ async def get_chapter(manga_id: str, chapter_id: str):
             )
         
         # Converter caminhos das páginas para URLs da API
-        chapter_data = chapter.model_dump()
+        chapter_data = chapter_to_dict(chapter)
         for page in chapter_data['pages']:
             # Corrigir URLs das páginas
             if not page['path'].startswith('/api/image'):
@@ -180,17 +203,16 @@ async def get_manga_chapters(manga_id: str, limit: int = Query(50, ge=1, le=200)
     """
     Retorna lista de capítulos de um mangá (para navegação)
     """
-    global CURRENT_LIBRARY_PATH
-    from app.main import CURRENT_LIBRARY_PATH
+    from app.core.library_state import library_state
     
-    if not CURRENT_LIBRARY_PATH:
+    if not library_state.current_path:
         raise HTTPException(
             status_code=400,
             detail="Nenhuma biblioteca configurada"
         )
     
     try:
-        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        library = scanner.scan_library(library_state.current_path)
         manga = library.get_manga(manga_id)
         
         if not manga:

@@ -11,10 +11,39 @@ import mimetypes
 import urllib.parse
 from app.core.services.manga_scanner import MangaScanner
 from app.api.endpoints.reader import router as reader_router
+from app.models.manga import LibraryResponse, MangaResponse
+from app.core.library_state import library_state
 
-# Imports locais
-from .core.services.manga_scanner import MangaScanner
-from .models.manga import LibraryResponse, MangaResponse
+def manga_to_dict(manga) -> dict:
+    """
+    Converte um objeto Manga para dict com serialização adequada de datetime
+    """
+    return {
+        "id": manga.id,
+        "title": manga.title,
+        "path": manga.path,
+        "thumbnail": manga.thumbnail,
+        "chapter_count": manga.chapter_count,
+        "total_pages": manga.total_pages,
+        "author": manga.author,
+        "artist": manga.artist,
+        "status": manga.status,
+        "genres": manga.genres,
+        "description": manga.description,
+        "date_added": manga.date_added.isoformat() if manga.date_added else None,
+        "date_modified": manga.date_modified.isoformat() if manga.date_modified else None,
+        "chapters": [
+            {
+                "id": chapter.id,
+                "name": chapter.name,
+                "number": chapter.number,
+                "volume": chapter.volume,
+                "page_count": chapter.page_count,
+                "date_added": chapter.date_added.isoformat() if chapter.date_added else None
+            }
+            for chapter in manga.chapters
+        ]
+    }
 
 def create_image_url(file_path: str) -> str:
     """
@@ -93,47 +122,8 @@ app.include_router(reader_router, prefix="/api", tags=["reader"])
 # Instância global do scanner
 scanner = MangaScanner()
 
-# Variável para armazenar o caminho da biblioteca atual
-CURRENT_LIBRARY_PATH: Optional[str] = None
-
-# Arquivo para persistir o caminho da biblioteca
-LIBRARY_PATH_FILE = "last_library_path.txt"
-
-def load_library_path() -> Optional[str]:
-    """Carrega o último caminho de biblioteca usado"""
-    try:
-        if Path(LIBRARY_PATH_FILE).exists():
-            with open(LIBRARY_PATH_FILE, 'r', encoding='utf-8') as f:
-                path = f.read().strip()
-                if path and Path(path).exists():
-                    print(f"📂 Carregado caminho salvo: {path}")
-                    return path
-                else:
-                    print(f"⚠️ Caminho salvo não existe mais: {path}")
-    except Exception as e:
-        print(f"❌ Erro ao carregar caminho salvo: {e}")
-    return None
-
-def save_library_path(path: str):
-    """Salva o caminho da biblioteca para próximas execuções"""
-    try:
-        with open(LIBRARY_PATH_FILE, 'w', encoding='utf-8') as f:
-            f.write(path)
-        print(f"💾 Caminho salvo: {path}")
-    except Exception as e:
-        print(f"❌ Erro ao salvar caminho: {e}")
-
-def clear_library_path():
-    """Remove o arquivo de caminho salvo"""
-    try:
-        if Path(LIBRARY_PATH_FILE).exists():
-            Path(LIBRARY_PATH_FILE).unlink()
-            print(f"🗑️ Arquivo de caminho removido: {LIBRARY_PATH_FILE}")
-    except Exception as e:
-        print(f"❌ Erro ao remover arquivo de caminho: {e}")
-
 # Carregar caminho salvo na inicialização
-CURRENT_LIBRARY_PATH = load_library_path()
+library_state.load_from_file()
 
 @app.get("/")
 async def root():
@@ -167,16 +157,11 @@ async def clear_library():
     """
     Limpa a biblioteca atual no backend
     """
-    global CURRENT_LIBRARY_PATH
-    
     try:
         print("🧹 Limpando biblioteca no backend...")
         
-        # Limpar variável global
-        CURRENT_LIBRARY_PATH = None
-        
-        # Remover arquivo de cache
-        clear_library_path()
+        # Limpar estado da biblioteca
+        library_state.clear()
         
         print("✅ Biblioteca limpa no backend")
         
@@ -204,7 +189,6 @@ async def scan_library_path(library_path: str = Form(...)):
     Returns:
         LibraryResponse: Biblioteca escaneada com mangás encontrados
     """
-    global CURRENT_LIBRARY_PATH
     
     try:
         # Limpar e normalizar o caminho
@@ -216,10 +200,9 @@ async def scan_library_path(library_path: str = Form(...)):
         print(f"🔤 Encoding: {library_path.encode('utf-8')}")
         
         # IMPORTANTE: Limpar biblioteca anterior primeiro
-        if CURRENT_LIBRARY_PATH != library_path:
-            print(f"🔄 Mudando biblioteca de '{CURRENT_LIBRARY_PATH}' para '{library_path}'")
-            CURRENT_LIBRARY_PATH = None
-            clear_library_path()
+        if library_state.current_path != library_path:
+            print(f"🔄 Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
+            library_state.clear()
         
         # Validar se o caminho existe - com tratamento melhor de Unicode
         try:
@@ -292,17 +275,15 @@ async def scan_library_path(library_path: str = Form(...)):
                 print(f"✅ Mantendo thumbnails como caminhos absolutos")
         
         # Atualizar caminho atual SOMENTE após sucesso
-        CURRENT_LIBRARY_PATH = str(path_obj)
+        library_state.current_path = str(path_obj)
         
-        # Salvar caminho para próximas execuções
-        save_library_path(str(path_obj))
         
         print(f"✅ Biblioteca escaneada: {library.total_mangas} mangás encontrados")
         
         # Converter para resposta da API com encoding seguro
         response_data = {
             "library": {
-                "mangas": [jsonable_encoder(manga.model_dump()) for manga in library.mangas],
+                "mangas": [manga_to_dict(manga) for manga in library.mangas],
                 "total_mangas": library.total_mangas,
                 "total_chapters": library.total_chapters,
                 "total_pages": library.total_pages,
@@ -347,8 +328,7 @@ async def scan_library_get(path: str):
         library_path = path
         
         # Reutilizar toda a lógica do POST
-        global CURRENT_LIBRARY_PATH
-        
+            
         # Limpar e normalizar o caminho
         library_path = library_path.strip()
         
@@ -356,10 +336,10 @@ async def scan_library_get(path: str):
         print(f"📥 [GET] Caminho recebido: '{library_path}'")
         
         # IMPORTANTE: Limpar biblioteca anterior primeiro
-        if CURRENT_LIBRARY_PATH != library_path:
-            print(f"🔄 [GET] Mudando biblioteca de '{CURRENT_LIBRARY_PATH}' para '{library_path}'")
-            CURRENT_LIBRARY_PATH = None
-            clear_library_path()
+        if library_state.current_path != library_path:
+            print(f"🔄 [GET] Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
+            library_state.clear()
+            library_state.clear()
         
         # Validar se o caminho existe
         path_obj = Path(library_path)
@@ -405,7 +385,7 @@ async def scan_library_get(path: str):
 
         
         # Atualizar caminho atual SOMENTE após sucesso
-        CURRENT_LIBRARY_PATH = str(path_obj)
+        library_state.current_path = str(path_obj)
         
         # Salvar caminho para próximas execuções
         save_library_path(str(path_obj))
@@ -415,7 +395,7 @@ async def scan_library_get(path: str):
         # Converter para resposta da API
         response_data = {
             "library": {
-                "mangas": [jsonable_encoder(manga.model_dump()) for manga in library.mangas],
+                "mangas": [manga_to_dict(manga) for manga in library.mangas],
                 "total_mangas": library.total_mangas,
                 "total_chapters": library.total_chapters,
                 "total_pages": library.total_pages,
@@ -448,12 +428,11 @@ async def get_library():
     """
     Retorna a biblioteca atual 
     """
-    global CURRENT_LIBRARY_PATH
     
     # Se há uma biblioteca configurada, reescanear
-    if CURRENT_LIBRARY_PATH and Path(CURRENT_LIBRARY_PATH).exists():
+    if library_state.current_path and Path(library_state.current_path).exists():
         try:
-            library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+            library = scanner.scan_library(library_state.current_path)
             
             # Criar resposta otimizada COM thumbnails funcionais
             optimized_mangas = []
@@ -485,7 +464,7 @@ async def get_library():
                 "total_chapters": library.total_chapters,
                 "total_pages": library.total_pages,
                 "message": f"Biblioteca com {library.total_mangas} mangás",
-                "scanned_path": CURRENT_LIBRARY_PATH,
+                "scanned_path": library_state.current_path,
                 "last_updated": library.last_updated.isoformat(),
             }
             
@@ -494,8 +473,8 @@ async def get_library():
         except Exception as e:
             print(f"❌ Erro ao recarregar biblioteca: {str(e)}")
             # Se falhar, limpar caminho
-            CURRENT_LIBRARY_PATH = None
-            clear_library_path()
+            library_state.clear()
+            library_state.clear()
     
     # Se não há biblioteca, retornar biblioteca vazia
     return JSONResponse(content={
@@ -509,20 +488,19 @@ async def get_library():
 @app.get("/api/manga/{manga_id}")
 async def get_manga(manga_id: str):
     """
-    Retorna detalhes de um mangá específico
+    Retorna detalhes completos de um mangá específico
     """
-    global CURRENT_LIBRARY_PATH
     
     # Se não há biblioteca configurada, retornar erro
-    if CURRENT_LIBRARY_PATH is None:
+    if library_state.current_path is None:
         raise HTTPException(
             status_code=400,
             detail="Nenhuma biblioteca configurada. Configure uma biblioteca primeiro."
         )
     
-    # Buscar mangá real na biblioteca escaneada
     try:
-        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        # Escanear biblioteca real
+        library = scanner.scan_library(library_state.current_path)
         manga = library.get_manga(manga_id)
         
         if not manga:
@@ -531,20 +509,49 @@ async def get_manga(manga_id: str):
                 detail=f"Mangá '{manga_id}' não encontrado na biblioteca"
             )
         
-        # Converter thumbnails e páginas para URLs da API
-        if manga.thumbnail:
-            manga.thumbnail = f"/api/image?path={manga.thumbnail}"
-        
-        for chapter in manga.chapters:
-            for page in chapter.pages:
-                page.path = f"/api/image?path={page.path}"
-        
-        response_data = {
-            "manga": jsonable_encoder(manga.model_dump()),
-            "message": f"Detalhes do mangá '{manga.title}' carregados",
+        # Preparar dados do mangá com serialização adequada de datetime
+        manga_data = {
+            "id": manga.id,
+            "title": manga.title,
+            "path": manga.path,
+            "thumbnail": create_image_url(manga.thumbnail) if manga.thumbnail else None,
+            "chapter_count": manga.chapter_count,
+            "total_pages": manga.total_pages,
+            "author": manga.author,
+            "artist": manga.artist,
+            "status": manga.status,
+            "genres": manga.genres,
+            "description": manga.description,
+            "date_added": manga.date_added.isoformat() if manga.date_added else None,
+            "date_modified": manga.date_modified.isoformat() if manga.date_modified else None
         }
         
-        return JSONResponse(content=jsonable_encoder(response_data))
+        # Preparar capítulos com thumbnails
+        chapters_with_thumbnails = []
+        for chapter in manga.chapters:
+            chapter_summary = {
+                "id": chapter.id,
+                "name": chapter.name,
+                "number": chapter.number,
+                "volume": chapter.volume,
+                "page_count": chapter.page_count,
+                "date_added": chapter.date_added.isoformat() if chapter.date_added else None,
+                "thumbnail_url": None
+            }
+            
+            # Adicionar thumbnail da primeira página
+            if chapter.pages:
+                first_page_path = chapter.pages[0].path
+                chapter_summary['thumbnail_url'] = create_image_url(first_page_path)
+            
+            chapters_with_thumbnails.append(chapter_summary)
+        
+        manga_data['chapters'] = chapters_with_thumbnails
+        
+        return JSONResponse(content={
+            "manga": manga_data,
+            "message": f"Detalhes do mangá '{manga.title}' carregados",
+        })
         
     except HTTPException:
         raise
@@ -588,7 +595,7 @@ async def serve_image(path: str):
     try:
         print(f"[IMAGE] Path recebido: {path}")
         
-        if not CURRENT_LIBRARY_PATH:
+        if not library_state.current_path:
             raise HTTPException(status_code=400, detail="Biblioteca não configurada")
         
         # Decodificar URL
@@ -610,7 +617,7 @@ async def serve_image(path: str):
         
         # Resolver caminhos absolutos
         file_path = Path(decoded_path).resolve()
-        library_root = Path(CURRENT_LIBRARY_PATH).resolve()
+        library_root = Path(library_state.current_path).resolve()
         
         print(f"📁 [IMAGE] Arquivo: {file_path}")
         print(f"📚 [IMAGE] Biblioteca: {library_root}")
@@ -639,13 +646,12 @@ async def debug_info():
     """
     Endpoint de debug para verificar estado do backend
     """
-    global CURRENT_LIBRARY_PATH
     
     return {
-        "current_library_path": CURRENT_LIBRARY_PATH,
-        "path_file_exists": Path(LIBRARY_PATH_FILE).exists(),
-        "path_file_content": Path(LIBRARY_PATH_FILE).read_text() if Path(LIBRARY_PATH_FILE).exists() else None,
-        "path_is_valid": Path(CURRENT_LIBRARY_PATH).exists() if CURRENT_LIBRARY_PATH else False,
+        "current_library_path": library_state.current_path,
+        "path_file_exists": Path(last_library_path.txt).exists(),
+        "path_file_content": Path(last_library_path.txt).read_text() if Path(last_library_path.txt).exists() else None,
+        "path_is_valid": library_state.validate_current_path(),
         "message": "Debug info"
     }
 
@@ -665,9 +671,8 @@ async def get_cache_info():
     """
     Obter informações sobre o cache da biblioteca atual
     """
-    global CURRENT_LIBRARY_PATH
     
-    if not CURRENT_LIBRARY_PATH:
+    if not library_state.current_path:
         return {
             "cache_enabled": True,
             "current_library": None,
@@ -675,11 +680,11 @@ async def get_cache_info():
         }
     
     try:
-        cache_info = scanner.get_cache_info(CURRENT_LIBRARY_PATH)
+        cache_info = scanner.get_cache_info(library_state.current_path)
         
         return {
             "cache_enabled": scanner.cache_enabled,
-            "current_library": CURRENT_LIBRARY_PATH,
+            "current_library": library_state.current_path,
             "cache_info": cache_info,
             "scanner_version": "Cache Híbrido v1.0"
         }
@@ -687,7 +692,7 @@ async def get_cache_info():
     except Exception as e:
         return {
             "cache_enabled": scanner.cache_enabled,
-            "current_library": CURRENT_LIBRARY_PATH,
+            "current_library": library_state.current_path,
             "cache_info": {"exists": False, "error": str(e)},
             "scanner_version": "Cache Híbrido v1.0"
         }
@@ -697,27 +702,26 @@ async def clear_cache():
     """
     Limpar cache da biblioteca atual
     """
-    global CURRENT_LIBRARY_PATH
     
-    if not CURRENT_LIBRARY_PATH:
+    if not library_state.current_path:
         raise HTTPException(
             status_code=400,
             detail="Nenhuma biblioteca configurada"
         )
     
     try:
-        success = scanner.clear_cache(CURRENT_LIBRARY_PATH)
+        success = scanner.clear_cache(library_state.current_path)
         
         if success:
             return {
                 "message": "Cache limpo com sucesso",
-                "library_path": CURRENT_LIBRARY_PATH,
+                "library_path": library_state.current_path,
                 "status": "cleared"
             }
         else:
             return {
                 "message": "Nenhum cache encontrado para limpar",
-                "library_path": CURRENT_LIBRARY_PATH,
+                "library_path": library_state.current_path,
                 "status": "no_cache"
             }
             
@@ -775,9 +779,8 @@ async def debug_performance():
     """
     Endpoint de debug para analisar performance do scanner
     """
-    global CURRENT_LIBRARY_PATH
     
-    if not CURRENT_LIBRARY_PATH:
+    if not library_state.current_path:
         return {
             "error": "Nenhuma biblioteca configurada",
             "current_library": None
@@ -787,20 +790,20 @@ async def debug_performance():
         import time
         from pathlib import Path
         
-        library_path = Path(CURRENT_LIBRARY_PATH)
+        library_path = Path(library_state.current_path)
         
         # Contar estrutura rapidamente
         manga_count = len([d for d in library_path.iterdir() if d.is_dir() and not d.name.startswith('.')])
         
         # Verificar cache
-        cache_info = scanner.get_cache_info(CURRENT_LIBRARY_PATH)
+        cache_info = scanner.get_cache_info(library_state.current_path)
         
         # Estimativas de performance
         estimated_time_with_cache = 0.1 if cache_info["exists"] else None
         estimated_time_without_cache = manga_count * 0.3  # ~300ms por mangá
         
         return {
-            "library_path": CURRENT_LIBRARY_PATH,
+            "library_path": library_state.current_path,
             "manga_count": manga_count,
             "cache_info": cache_info,
             "performance_estimates": {
@@ -899,13 +902,12 @@ async def set_library_path(data: dict):
 @app.get("/api/debug/thumbnails")
 async def debug_thumbnails():
     """Debug das thumbnails da biblioteca atual"""
-    global CURRENT_LIBRARY_PATH
     
-    if not CURRENT_LIBRARY_PATH:
+    if not library_state.current_path:
         return {"error": "Nenhuma biblioteca configurada"}
     
     try:
-        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
+        library = scanner.scan_library(library_state.current_path)
         
         debug_info = []
         for manga in library.mangas:
@@ -919,7 +921,7 @@ async def debug_thumbnails():
             debug_info.append(thumbnail_info)
         
         return {
-            "library_path": CURRENT_LIBRARY_PATH,
+            "library_path": library_state.current_path,
             "total_mangas": len(debug_info),
             "thumbnails": debug_info
         }
@@ -927,85 +929,16 @@ async def debug_thumbnails():
     except Exception as e:
         return {"error": str(e)}
     
-@app.get("/api/manga/{manga_id}")
-async def get_manga_detail(manga_id: str):
-    """
-    Retorna detalhes completos de um mangá para a página de detalhes
-    """
-    global CURRENT_LIBRARY_PATH
-    
-    if not CURRENT_LIBRARY_PATH:
-        # Se não há biblioteca configurada, retornar erro
-        if CURRENT_LIBRARY_PATH is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Nenhuma biblioteca configurada. Configure uma biblioteca primeiro."
-            )
-
-    try:
-        # Escanear biblioteca real
-        library = scanner.scan_library(CURRENT_LIBRARY_PATH)
-        manga = library.get_manga(manga_id)
-        
-        if not manga:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Mangá '{manga_id}' não encontrado"
-            )
-        
-        # Preparar dados do mangá
-        manga_data = manga.model_dump()
-        
-        # Converter thumbnail para URL
-        if manga_data.get('thumbnail'):
-            manga_data['thumbnail'] = create_image_url(manga_data['thumbnail'])
-        
-        # Preparar capítulos com thumbnails
-        chapters_with_thumbnails = []
-        for chapter in manga_data['chapters']:
-            chapter_summary = {
-                "id": chapter['id'],
-                "name": chapter['name'],
-                "number": chapter.get('number'),
-                "volume": chapter.get('volume'),
-                "page_count": chapter['page_count'],
-                "date_added": chapter.get('date_added'),
-                "thumbnail_url": None
-            }
-            
-            # Adicionar thumbnail da primeira página
-            if chapter['pages']:
-                first_page_path = chapter['pages'][0]['path']
-                chapter_summary['thumbnail_url'] = create_image_url(first_page_path)
-            
-            chapters_with_thumbnails.append(chapter_summary)
-        
-        manga_data['chapters'] = chapters_with_thumbnails
-        
-        return JSONResponse(content={
-            "manga": manga_data,
-            "message": f"Detalhes do mangá '{manga.title}' carregados",
-        })
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Erro ao buscar mangá {manga_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao buscar mangá: {str(e)}"
-        )
 
 @app.get("/api/debug/reader")
 async def debug_reader_info():
     """
     Endpoint de debug para o sistema de leitura
     """
-    global CURRENT_LIBRARY_PATH
     
     debug_info = {
-        "library_configured": CURRENT_LIBRARY_PATH is not None,
-        "library_path": CURRENT_LIBRARY_PATH,
+        "library_configured": library_state.current_path is not None,
+        "library_path": library_state.current_path,
         "cache_entries": len(_chapter_cache) if '_chapter_cache' in globals() else 0,
         "progress_file_exists": Path("reading_progress.json").exists(),
         "available_endpoints": [
