@@ -9,7 +9,7 @@
 - [x] **Código duplicado** entre endpoints POST e GET de scan-library 
 - [x] **Métodos obsoletos no MangaScanner** 
 
-## Problemas Alta Urgentes
+## Problemas de Alta Urgência
 
 - [ ] **Arquivo main.py muito grande** com 1034 linhas e múltiplas responsabilidades
   - **Impacto**: Dificulta navegação e manutenção
@@ -26,7 +26,7 @@
     - `CacheManager` - Gerenciamento de cache
     - `ChapterParser` - Parsing de capítulos
 
-## Problemas Médio Urgência
+## Problemas de Média Urgência
 
 ### Code Quality
 
