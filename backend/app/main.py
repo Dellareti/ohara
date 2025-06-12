@@ -178,33 +178,26 @@ async def clear_library():
             "status": "error"
         }
 
-@app.post("/api/scan-library")
-async def scan_library_path(library_path: str = Form(...)):
+def _scan_library_common(library_path: str, method: str = "POST"):
     """
-    Escaneia uma pasta de biblioteca de mangás
-    
-    Args:
-        library_path: Caminho absoluto para a pasta da biblioteca
-    
-    Returns:
-        LibraryResponse: Biblioteca escaneada com mangás encontrados
+    Lógica comum para escanear biblioteca (usada por POST e GET)
     """
+    # Limpar e normalizar o caminho
+    library_path = library_path.strip()
     
-    try:
-        # Limpar e normalizar o caminho
-        library_path = library_path.strip()
-        
-        # Log para debug
-        print(f"📥 Caminho recebido: '{library_path}'")
+    # Log para debug
+    print(f"📥 [{method}] Caminho recebido: '{library_path}'")
+    if method == "POST":
         print(f"📏 Comprimento: {len(library_path)} caracteres")
         print(f"🔤 Encoding: {library_path.encode('utf-8')}")
-        
-        # IMPORTANTE: Limpar biblioteca anterior primeiro
-        if library_state.current_path != library_path:
-            print(f"🔄 Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
-            library_state.clear()
-        
-        # Validar se o caminho existe - com tratamento melhor de Unicode
+    
+    # IMPORTANTE: Limpar biblioteca anterior primeiro
+    if library_state.current_path != library_path:
+        print(f"🔄 [{method}] Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
+        library_state.clear()
+    
+    # Validar se o caminho existe - com tratamento melhor de Unicode para POST
+    if method == "POST":
         try:
             path_obj = Path(library_path)
             print(f"📁 Path object criado: {path_obj}")
@@ -216,8 +209,12 @@ async def scan_library_path(library_path: str = Form(...)):
                 status_code=400,
                 detail=f"Caminho inválido (erro de encoding): {library_path}"
             )
-        
-        if not path_obj.exists():
+    else:
+        path_obj = Path(library_path)
+        print(f"📁 [{method}] Path object criado: {path_obj}")
+    
+    if not path_obj.exists():
+        if method == "POST":
             # Tentar variações comuns de encoding
             alternative_paths = [
                 Path(library_path.encode('utf-8').decode('utf-8')),
@@ -241,59 +238,87 @@ async def scan_library_path(library_path: str = Form(...)):
                     status_code=400,
                     detail=f"Caminho não encontrado: {library_path}"
                 )
-        
-        if not path_obj.is_dir():
+        else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Caminho não é um diretório: {library_path}"
+                detail=f"Caminho não encontrado: {library_path}"
             )
-        
-        # Validar permissões de leitura
-        if not os.access(str(path_obj), os.R_OK):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Sem permissão de leitura: {library_path}"
-            )
-        
-        # Verificar se existem subpastas (indicativo de mangás)
-        subdirs = [d for d in path_obj.iterdir() if d.is_dir()]
-        if len(subdirs) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
-            )
-        
-        print(f"🔍 Escaneando biblioteca: {library_path}")
-        print(f"📂 Subpastas encontradas: {len(subdirs)}")
-        
-        # Escanear biblioteca usando o scanner real
-        library = scanner.scan_library(str(path_obj))
-        
-        # Converter thumbnails para URLs da API
-        for manga in library.mangas:
-            if manga.thumbnail:
-                print(f"✅ Mantendo thumbnails como caminhos absolutos")
-        
-        # Atualizar caminho atual SOMENTE após sucesso
-        library_state.current_path = str(path_obj)
-        
-        
-        print(f"✅ Biblioteca escaneada: {library.total_mangas} mangás encontrados")
-        
-        # Converter para resposta da API com encoding seguro
-        response_data = {
-            "library": {
-                "mangas": [manga_to_dict(manga) for manga in library.mangas],
-                "total_mangas": library.total_mangas,
-                "total_chapters": library.total_chapters,
-                "total_pages": library.total_pages,
-                "last_updated": library.last_updated.isoformat()
-            },
-            "message": f"Biblioteca escaneada com sucesso! {library.total_mangas} mangás encontrados.",
-            "scanned_path": str(path_obj),
-            "timestamp": library.last_updated.isoformat()
-        }
-        
+    
+    if not path_obj.is_dir():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Caminho não é um diretório: {library_path}"
+        )
+    
+    # Validar permissões de leitura
+    if not os.access(str(path_obj), os.R_OK):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Sem permissão de leitura: {library_path}"
+        )
+    
+    # Verificar se existem subpastas (indicativo de mangás)
+    subdirs = [d for d in path_obj.iterdir() if d.is_dir()]
+    if len(subdirs) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
+        )
+    
+    print(f"🔍 [{method}] Escaneando biblioteca: {library_path}")
+    print(f"📂 [{method}] Subpastas encontradas: {len(subdirs)}")
+    
+    # Escanear biblioteca usando o scanner real
+    library = scanner.scan_library(str(path_obj))
+    
+    # Converter thumbnails para URLs da API
+    for manga in library.mangas:
+        if manga.thumbnail:
+            print(f"✅ Mantendo thumbnails como caminhos absolutos")
+    
+    # Atualizar caminho atual SOMENTE após sucesso
+    library_state.current_path = str(path_obj)
+    
+    if method == "GET":
+        # Salvar caminho para próximas execuções
+        save_library_path(str(path_obj))
+    
+    print(f"✅ [{method}] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
+    
+    # Converter para resposta da API
+    response_data = {
+        "library": {
+            "mangas": [manga_to_dict(manga) for manga in library.mangas],
+            "total_mangas": library.total_mangas,
+            "total_chapters": library.total_chapters,
+            "total_pages": library.total_pages,
+            "last_updated": library.last_updated.isoformat()
+        },
+        "message": f"Biblioteca escaneada com sucesso! {library.total_mangas} mangás encontrados.",
+        "scanned_path": str(path_obj),
+        "timestamp": library.last_updated.isoformat()
+    }
+    
+    if method == "GET":
+        response_data["method"] = "GET"
+    
+    return response_data
+
+
+@app.post("/api/scan-library")
+async def scan_library_path(library_path: str = Form(...)):
+    """
+    Escaneia uma pasta de biblioteca de mangás
+    
+    Args:
+        library_path: Caminho absoluto para a pasta da biblioteca
+    
+    Returns:
+        LibraryResponse: Biblioteca escaneada com mangás encontrados
+    """
+    
+    try:
+        response_data = _scan_library_common(library_path, "POST")
         return JSONResponse(content=jsonable_encoder(response_data))
         
     except HTTPException:
@@ -321,92 +346,7 @@ async def scan_library_get(path: str):
     Redireciona para a implementação POST principal
     """
     try:
-        # Chama a função principal usando FormData internamente
-        from fastapi import Form
-        
-        # Simular FormData para reutilizar a lógica existente
-        library_path = path
-        
-        # Reutilizar toda a lógica do POST
-            
-        # Limpar e normalizar o caminho
-        library_path = library_path.strip()
-        
-        # Log para debug
-        print(f"📥 [GET] Caminho recebido: '{library_path}'")
-        
-        # IMPORTANTE: Limpar biblioteca anterior primeiro
-        if library_state.current_path != library_path:
-            print(f"🔄 [GET] Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
-            library_state.clear()
-            library_state.clear()
-        
-        # Validar se o caminho existe
-        path_obj = Path(library_path)
-        print(f"📁 [GET] Path object criado: {path_obj}")
-        
-        if not path_obj.exists():
-            raise HTTPException(
-                status_code=400,
-                detail=f"Caminho não encontrado: {library_path}"
-            )
-        
-        if not path_obj.is_dir():
-            raise HTTPException(
-                status_code=400,
-                detail=f"Caminho não é um diretório: {library_path}"
-            )
-        
-        # Validar permissões de leitura
-        if not os.access(str(path_obj), os.R_OK):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Sem permissão de leitura: {library_path}"
-            )
-        
-        # Verificar se existem subpastas (indicativo de mangás)
-        subdirs = [d for d in path_obj.iterdir() if d.is_dir()]
-        if len(subdirs) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
-            )
-        
-        print(f"🔍 [GET] Escaneando biblioteca: {library_path}")
-        print(f"📂 [GET] Subpastas encontradas: {len(subdirs)}")
-        
-        # Escanear biblioteca usando o scanner real
-        library = scanner.scan_library(str(path_obj))
-        
-        # Converter thumbnails para URLs da API
-        for manga in library.mangas:
-            if manga.thumbnail:
-                print(f"✅ Mantendo thumbnails como caminhos absolutos")
-
-        
-        # Atualizar caminho atual SOMENTE após sucesso
-        library_state.current_path = str(path_obj)
-        
-        # Salvar caminho para próximas execuções
-        save_library_path(str(path_obj))
-        
-        print(f"✅ [GET] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
-        
-        # Converter para resposta da API
-        response_data = {
-            "library": {
-                "mangas": [manga_to_dict(manga) for manga in library.mangas],
-                "total_mangas": library.total_mangas,
-                "total_chapters": library.total_chapters,
-                "total_pages": library.total_pages,
-                "last_updated": library.last_updated.isoformat()
-            },
-            "message": f"Biblioteca escaneada com sucesso! {library.total_mangas} mangás encontrados.",
-            "scanned_path": str(path_obj),
-            "timestamp": library.last_updated.isoformat(),
-            "method": "GET"
-        }
-        
+        response_data = _scan_library_common(path, "GET")
         return JSONResponse(content=jsonable_encoder(response_data))
         
     except HTTPException:

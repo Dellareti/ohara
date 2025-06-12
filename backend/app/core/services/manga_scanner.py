@@ -720,9 +720,6 @@ class MangaScanner:
         
         return [convert(c) for c in re.split('([0-9]+)', text)]
     
-    def refresh_manga(self, manga_path: str) -> Optional[Manga]:
-        """Método original preservado"""
-        return self.scan_manga(manga_path)
     
     def validate_library_path(self, path: str) -> Tuple[bool, str]:
         """Método original preservado"""

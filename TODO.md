@@ -6,12 +6,10 @@
 - [x] **Endpoint duplicado** `/api/manga/{manga_id}
 - [x] **Variável global** CURRENT_LIBRARY_PATH sem sincronização thread-safe
 - [x] **Import circular** potencial em reader.py com `from app.main import CURRENT_LIBRARY_PATH`
+- [x] **Código duplicado** entre endpoints POST e GET de scan-library 
+- [x] **Métodos obsoletos no MangaScanner** 
 
-## Problemas Urgentes
-
-- [ ] **Código duplicado massivo** entre endpoints POST e GET de scan-library (248 linhas duplicadas em main.py:196-444)
-  - **Impacto**: Dificuldade de manutenção, inconsistências
-  - **Solução**: Extrair lógica comum para função `_scan_library_common()`
+## Problemas Alta Urgentes
 
 - [ ] **Arquivo main.py muito grande** com 1034 linhas e múltiplas responsabilidades
   - **Impacto**: Dificulta navegação e manutenção
@@ -28,11 +26,7 @@
     - `CacheManager` - Gerenciamento de cache
     - `ChapterParser` - Parsing de capítulos
 
-- [ ] **Métodos obsoletos no MangaScanner** 
-  - **Impacto**: Confusão, código morto
-  - **Solução**: Remover métodos marcados como "preservados" que não são mais usados
-
-## Problemas Médios
+## Problemas Médio Urgência
 
 ### Code Quality
 
@@ -51,7 +45,7 @@
   - **Impacto**: Possíveis erros não tratados
   - **Solução**: Usar Pydantic models para request/response validation
 
-## Problemas Baixos 
+## Problemas de Baixa Urgência
 
 ### Desenvolvimento
 
