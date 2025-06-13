@@ -45,7 +45,7 @@ class LibraryState:
                         print(f"📂 Caminho carregado: {path}")
                         return path
                     else:
-                        print(f"⚠️ Caminho salvo não existe mais: {path}")
+                        print(f"Caminho salvo não existe mais: {path}")
         except Exception as e:
             print(f"❌ Erro ao carregar caminho: {e}")
         return None

@@ -82,7 +82,7 @@ export const useReaderStore = defineStore('reader', {
     
     // Verificar navegação baseada na lista completa
     hasPreviousChapter: (state) => {
-      console.log('🔍 Verificando capítulo anterior:', {
+      console.log('Verificando capítulo anterior:', {
         navigation: state.navigation,
         previousChapter: state.navigation.previousChapter,
         allChapters: state.navigation.allChapters?.length
@@ -91,7 +91,7 @@ export const useReaderStore = defineStore('reader', {
     },
     
     hasNextChapter: (state) => {
-      console.log('🔍 Verificando próximo capítulo:', {
+      console.log('Verificando próximo capítulo:', {
         navigation: state.navigation,
         nextChapter: state.navigation.nextChapter,
         allChapters: state.navigation.allChapters?.length
@@ -138,8 +138,8 @@ export const useReaderStore = defineStore('reader', {
         // 6. Pré-carregar páginas
         this.preloadPages()
         
-        console.log(`✅ Capítulo carregado: ${data.chapter.name} (${this.totalPages} páginas)`)
-        console.log('🧭 Navegação final:', this.navigation)
+        console.log(`Capítulo carregado: ${data.chapter.name} (${this.totalPages} páginas)`)
+        console.log('Navegação final:', this.navigation)
         
         return data
         
@@ -164,7 +164,7 @@ export const useReaderStore = defineStore('reader', {
         console.log('📚 Lista de capítulos recebida:', chaptersData)
         
         if (!chaptersData.chapters || !Array.isArray(chaptersData.chapters)) {
-          console.warn('⚠️ Lista de capítulos inválida')
+          console.warn('Lista de capítulos inválida')
           this.navigation = {
             previousChapter: null,
             nextChapter: null,
@@ -185,15 +185,15 @@ export const useReaderStore = defineStore('reader', {
         )
         
         console.log(`🎯 Capítulo atual encontrado no índice: ${currentIndex}`)
-        console.log(`🔍 Procurando por ID: "${currentChapterId}"`)
+        console.log(`Procurando por ID: "${currentChapterId}"`)
         console.log('📋 IDs disponíveis:', allChapters.map(ch => ch.id))
         
         if (currentIndex === -1) {
-          console.warn('⚠️ Capítulo atual não encontrado na lista')
+          console.warn('Capítulo atual não encontrado na lista')
           // Tentar busca mais flexível
           const flexibleIndex = this.findChapterFlexible(allChapters, currentChapterId)
           if (flexibleIndex !== -1) {
-            console.log(`✅ Capítulo encontrado com busca flexível no índice: ${flexibleIndex}`)
+            console.log(`Capítulo encontrado com busca flexível no índice: ${flexibleIndex}`)
             this.setupNavigation(allChapters, flexibleIndex)
           } else {
             this.navigation = {
@@ -221,7 +221,7 @@ export const useReaderStore = defineStore('reader', {
 
     // Busca flexível para IDs de capítulos
     findChapterFlexible(chapters, targetId) {
-      console.log(`🔍 Busca flexível para: "${targetId}"`)
+      console.log(`Busca flexível para: "${targetId}"`)
       
       // Tentar várias estratégias de busca
       const strategies = [
@@ -254,7 +254,7 @@ export const useReaderStore = defineStore('reader', {
       for (let i = 0; i < strategies.length; i++) {
         const index = strategies[i](targetId);
         if (index !== -1) {
-          console.log(`✅ Estratégia ${i + 1} encontrou capítulo no índice: ${index}`);
+          console.log(`Estratégia ${i + 1} encontrou capítulo no índice: ${index}`);
           return index;
         }
       }
@@ -314,7 +314,7 @@ export const useReaderStore = defineStore('reader', {
         }
         
       } catch (error) {
-        console.warn('⚠️ Erro ao carregar progresso:', error)
+        console.warn('Erro ao carregar progresso:', error)
         this.currentPage = 0
       }
     },
@@ -449,7 +449,7 @@ export const useReaderStore = defineStore('reader', {
           Object.assign(this, settings)
         }
       } catch (error) {
-        console.warn('⚠️ Erro ao carregar configurações:', error)
+        console.warn('Erro ao carregar configurações:', error)
       }
     },
 

@@ -44,7 +44,7 @@ export default {
         const response = await fetch('http://localhost:8000/api/test')
         if (response.ok) {
           isConnected.value = true
-          console.log('✅ Sistema online')
+          console.log('Sistema online')
         } else {
           isConnected.value = false
           console.log('❌ Sistema com erro:', response.status)

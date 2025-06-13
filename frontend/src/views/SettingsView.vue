@@ -315,9 +315,9 @@ export default {
         localStorage.setItem('ohara_system_settings', JSON.stringify(settings))
         
         // Mostrar feedback
-        alert('✅ Configurações salvas com sucesso!')
+        alert('Configurações salvas com sucesso!')
         
-        console.log('✅ Configurações salvas:', settings)
+        console.log('Configurações salvas:', settings)
       } catch (error) {
         console.error('Erro ao salvar configurações:', error)
         alert('❌ Erro ao salvar configurações')
@@ -378,7 +378,7 @@ export default {
         link.download = 'ohara_settings.json'
         link.click()
         
-        console.log('✅ Configurações exportadas')
+        console.log('Configurações exportadas')
       } catch (error) {
         console.error('Erro ao exportar configurações:', error)
         alert('❌ Erro ao exportar configurações')
@@ -405,7 +405,7 @@ export default {
             if (settings.backup) Object.assign(backupSettings, settings.backup)
             
             saveSettings()
-            alert('✅ Configurações importadas com sucesso!')
+            alert('Configurações importadas com sucesso!')
           } catch (error) {
             console.error('Erro ao importar configurações:', error)
             alert('❌ Erro ao importar configurações: arquivo inválido')

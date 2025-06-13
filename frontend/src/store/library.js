@@ -89,12 +89,12 @@ export const useLibraryStore = defineStore('library', {
         })
         
         if (response.ok) {
-          console.log('✅ Backend limpo com sucesso')
+          console.log('Backend limpo com sucesso')
         } else {
-          console.warn('⚠️ Erro ao limpar backend:', response.status)
+          console.warn('Erro ao limpar backend:', response.status)
         }
       } catch (error) {
-        console.warn('⚠️ Erro na comunicação com backend:', error.message)
+        console.warn('Erro na comunicação com backend:', error.message)
       }
     },
 
@@ -104,7 +104,7 @@ export const useLibraryStore = defineStore('library', {
         throw new Error('Caminho da biblioteca não configurado')
       }
       
-      console.log('🔍 Escaneando biblioteca:', this.libraryPath)
+      console.log('Escaneando biblioteca:', this.libraryPath)
       this.loading = true
       this.scanning = true
       this.error = null
@@ -193,7 +193,7 @@ export const useLibraryStore = defineStore('library', {
           this.saveLibraryConfig()
         }
         
-        console.log('✅ Biblioteca carregada:', {
+        console.log('Biblioteca carregada:', {
           mangas: this.totalMangas,
           fromCache: false
         })
@@ -222,7 +222,7 @@ export const useLibraryStore = defineStore('library', {
         
         this.currentManga = data.manga || data
         
-        console.log('✅ Mangá carregado:', this.currentManga.title)
+        console.log('Mangá carregado:', this.currentManga.title)
         return this.currentManga
         
       } catch (error) {
@@ -283,12 +283,12 @@ export const useLibraryStore = defineStore('library', {
       // 3. Notificar backend para limpar cache
       await this.clearBackendLibrary()
       
-      console.log('✅ Biblioteca limpa completamente')
+      console.log('Biblioteca limpa completamente')
     },
 
     // Configurar caminho da biblioteca
     async setLibraryPath(path) {
-      console.log('📁 Configurando caminho da biblioteca:', path)
+      console.log('Configurando caminho da biblioteca:', path)
       
       try {
         // Validar caminho primeiro
@@ -319,7 +319,7 @@ export const useLibraryStore = defineStore('library', {
           // Salvar no localStorage
           this.saveLibraryConfig()
           
-          console.log('✅ Biblioteca configurada:', data.message)
+          console.log('Biblioteca configurada:', data.message)
           return true
         } else {
           throw new Error(data.message)
@@ -341,7 +341,7 @@ export const useLibraryStore = defineStore('library', {
           console.log('💾 Configuração salva no localStorage')
         }
       } catch (error) {
-        console.warn('⚠️ Erro ao salvar no localStorage:', error)
+        console.warn('Erro ao salvar no localStorage:', error)
       }
     },
 
@@ -364,7 +364,7 @@ export const useLibraryStore = defineStore('library', {
           return savedPath
         }
       } catch (error) {
-        console.warn('⚠️ Erro ao carregar do localStorage:', error)
+        console.warn('Erro ao carregar do localStorage:', error)
       }
       
       return null
@@ -387,7 +387,7 @@ export const useLibraryStore = defineStore('library', {
         
         console.log('🗑️ Configuração limpa do localStorage')
       } catch (error) {
-        console.warn('⚠️ Erro ao limpar localStorage:', error)
+        console.warn('Erro ao limpar localStorage:', error)
       }
     },
 
@@ -429,7 +429,7 @@ export const useLibraryStore = defineStore('library', {
           try {
             await this.scanLibrary()
           } catch (error) {
-            console.warn('⚠️ Erro ao reescanear biblioteca salva:', error)
+            console.warn('Erro ao reescanear biblioteca salva:', error)
             this.clearLibraryConfig()
           }
         }
@@ -444,7 +444,7 @@ export const useLibraryStore = defineStore('library', {
     // Validar caminho de biblioteca
     async validatePath(path) {
       try {
-        console.log('🔍 Validando caminho:', path)
+        console.log('Validando caminho:', path)
         
         // Validação local primeiro
         const localValidation = apiUtils.validatePathFormat(path)

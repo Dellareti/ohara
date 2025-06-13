@@ -37,7 +37,7 @@
           <!-- Status de Validação -->
           <div v-if="validation.checked" class="validation-status">
             <div v-if="validation.valid" class="status valid">
-              ✅ {{ validation.message }}
+              {{ validation.message }}
             </div>
             <div v-else class="status invalid">
               ❌ {{ validation.message }}
@@ -215,7 +215,7 @@ export default {
         await libraryStore.setLibraryPath(libraryPath.value)
         
         // 2. Depois, escanear usando POST com FormData
-        console.log('🔍 Iniciando scan da biblioteca...')
+        console.log('Iniciando scan da biblioteca...')
         
         const formData = new FormData()
         formData.append('library_path', libraryPath.value)
@@ -239,7 +239,7 @@ export default {
           libraryStore.totalPages = data.library.total_pages || 0
           libraryStore.isInitialized = true
           
-          console.log('✅ Biblioteca configurada e escaneada:', data.message)
+          console.log('Biblioteca configurada e escaneada:', data.message)
           
           // Redirecionar para biblioteca
           router.push('/library')

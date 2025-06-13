@@ -1,9 +1,9 @@
 <template>
   <div class="test-component">
-    <h2>🧪 Componente de Teste</h2>
+    <h2>Componente de Teste</h2>
     <p>Se você está vendo isto, o Vue.js está funcionando!</p>
     <button @click="testClick">Clique aqui</button>
-    <p v-if="clicked">✅ Clique funcionou!</p>
+    <p v-if="clicked">Clique funcionou!</p>
   </div>
 </template>
 
@@ -17,7 +17,7 @@ export default {
     
     const testClick = () => {
       clicked.value = true
-      console.log('🎉 Vue.js funcionando!')
+      console.log('Vue.js funcionando!')
     }
     
     return {

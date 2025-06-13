@@ -90,7 +90,7 @@
             <input 
               v-model="searchTerm" 
               type="text" 
-              placeholder="🔍 Buscar capítulo..."
+              placeholder="Buscar capítulo..."
               class="search-input"
             />
             

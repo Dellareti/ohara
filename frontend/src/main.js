@@ -16,8 +16,8 @@ app.use(store)
 
 app.mount('#app')
 
-console.log('✅ Ohara carregado!')
-console.log('🔧 Router atual:', router.currentRoute.value.path)
+console.log('Ohara carregado!')
+console.log('Router atual:', router.currentRoute.value.path)
 
 // Inicializar store uma única vez no aplicativo
 import { useLibraryStore } from './store/library.js'

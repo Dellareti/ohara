@@ -42,9 +42,7 @@ scanner = MangaScanner()
 _chapter_cache = {}
 
 def _find_chapter_flexible(manga, chapter_id: str):
-    """
-    ✅ NOVA FUNÇÃO: Busca capítulo por múltiplos critérios
-    
+    """    
     Aceita:
     - ID exato: "kagurabachi-ch-78.0"
     - Slug customizado: "sirius-scanlator-chapter-78-substituicao"  
@@ -52,12 +50,12 @@ def _find_chapter_flexible(manga, chapter_id: str):
     - Por nome parcial: "Chapter 78"
     """
     
-    print(f"🔍 Buscando capítulo: '{chapter_id}'")
+    print(f"Buscando capítulo: '{chapter_id}'")
     
     # 1. Busca por ID exato (mais rápida)
     for chapter in manga.chapters:
         if chapter.id == chapter_id:
-            print(f"✅ Encontrado por ID exato: {chapter.id}")
+            print(f"Encontrado por ID exato: {chapter.id}")
             return chapter
     
     # 2. Busca por número do capítulo
@@ -68,7 +66,7 @@ def _find_chapter_flexible(manga, chapter_id: str):
             search_number = float(numbers[0])
             for chapter in manga.chapters:
                 if chapter.number == search_number:
-                    print(f"✅ Encontrado por número: {chapter.number} -> {chapter.id}")
+                    print(f"Encontrado por número: {chapter.number} -> {chapter.id}")
                     return chapter
     except Exception as e:
         print(f"⚠️ Erro na busca por número: {e}")
@@ -83,7 +81,7 @@ def _find_chapter_flexible(manga, chapter_id: str):
         clean_name = re.sub(r'[^\w\s]', '', chapter_name_lower)
         
         if clean_id in clean_name or clean_name in clean_id:
-            print(f"✅ Encontrado por nome parcial: '{chapter_id}' -> {chapter.id}")
+            print(f"Encontrado por nome parcial: '{chapter_id}' -> {chapter.id}")
             return chapter
     
     # 4. Busca por palavras-chave
@@ -94,7 +92,7 @@ def _find_chapter_flexible(manga, chapter_id: str):
         # Se pelo menos 2 palavras coincidirem
         matches = sum(1 for word in words_in_id if word in chapter_words)
         if matches >= 2:
-            print(f"✅ Encontrado por palavras-chave ({matches} matches): {chapter.id}")
+            print(f"Encontrado por palavras-chave ({matches} matches): {chapter.id}")
             return chapter
     
     # 5. Não encontrado
@@ -109,7 +107,7 @@ def _find_chapter_flexible(manga, chapter_id: str):
 async def get_chapter(manga_id: str, chapter_id: str):
     """
     Retorna dados completos de um capítulo específico
-    ✅ CORRIGIDO: Aceita múltiplos formatos de chapter_id
+    Aceita múltiplos formatos de chapter_id
     """
     from app.core.library_state import library_state
     
@@ -138,11 +136,11 @@ async def get_chapter(manga_id: str, chapter_id: str):
                 detail=f"Mangá '{manga_id}' não encontrado"
             )
         
-        # ✅ CORREÇÃO: Buscar capítulo por múltiplos critérios
+        # Buscar capítulo por múltiplos critérios
         chapter = _find_chapter_flexible(manga, chapter_id)
         
         if not chapter:
-            # ✅ DEBUG: Mostrar capítulos disponíveis
+            # Mostrar capítulos disponíveis
             available_chapters = [{"id": ch.id, "name": ch.name, "number": ch.number} for ch in manga.chapters[:10]]
             
             raise HTTPException(

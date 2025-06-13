@@ -60,39 +60,39 @@ def create_image_url(file_path: str) -> str:
     
     # Se já é uma URL da API, retornar como está
     if file_path.startswith('/api/image'):
-        print(f"✅ URL da API reutilizada: {file_path[:50]}...")
+        print(f"URL da API reutilizada: {file_path[:50]}...")
         return file_path 
     
     # Se é URL externa, retornar como está
     if file_path.startswith('http'):
-        print(f"✅ URL externa detectada: {file_path[:50]}...")
+        print(f"URL externa detectada: {file_path[:50]}...")
         return file_path
     
     # Validar se é um caminho de arquivo válido
     try:
         file_obj = Path(file_path)
         if not file_obj.exists() or not file_obj.is_file():
-            print(f"⚠️ Arquivo não existe: {file_path}")
+            print(f"Arquivo não existe: {file_path}")
             return None
             
         # Verificar se é imagem
         mime_type, _ = mimetypes.guess_type(str(file_obj))
         if not mime_type or not mime_type.startswith('image/'):
-            print(f"⚠️ Não é imagem: {file_path} (MIME: {mime_type})")
+            print(f"Não é imagem: {file_path} (MIME: {mime_type})")
             return None
             
     except Exception as e:
-        print(f"⚠️ Erro ao validar arquivo {file_path}: {e}")
+        print(f"Erro ao validar arquivo {file_path}: {e}")
         return None
     
     # Converter caminho absoluto para URL da API
     try:
         encoded_path = urllib.parse.quote(file_path, safe='')
         clean_url = f"/api/image?path={encoded_path}"
-        print(f"✅ URL criada: {file_obj.name} -> {clean_url[:50]}...")
+        print(f"URL criada: {file_obj.name} -> {clean_url[:50]}...")
         return clean_url
     except Exception as e:
-        print(f"❌ Erro ao criar URL para {file_path}: {e}")
+        print(f"Erro ao criar URL para {file_path}: {e}")
         return None
 
 # Criar aplicação FastAPI
@@ -145,9 +145,9 @@ async def health_check():
 @app.get("/api/test")
 async def test_endpoint():
     return {
-        "message": "🎉 API Ohara funcionando!",
-        "backend": "FastAPI ✅",
-        "scanner": "MangaScanner ✅",
+        "message": "API Ohara funcionando!",
+        "backend": "FastAPI",
+        "scanner": "MangaScanner",
         "status": "OK",
         "tip": "Use /api/scan-library para escanear uma pasta real"
     }
@@ -163,7 +163,7 @@ async def clear_library():
         # Limpar estado da biblioteca
         library_state.clear()
         
-        print("✅ Biblioteca limpa no backend")
+        print("Biblioteca limpa no backend")
         
         return {
             "message": "Biblioteca limpa com sucesso",
@@ -172,7 +172,7 @@ async def clear_library():
         }
         
     except Exception as e:
-        print(f"❌ Erro ao limpar biblioteca: {str(e)}")
+        print(f"Erro ao limpar biblioteca: {str(e)}")
         return {
             "message": f"Erro ao limpar biblioteca: {str(e)}",
             "status": "error"
@@ -200,18 +200,18 @@ def _scan_library_common(library_path: str, method: str = "POST"):
     if method == "POST":
         try:
             path_obj = Path(library_path)
-            print(f"📁 Path object criado: {path_obj}")
-            print(f"🔍 Absolute path: {path_obj.absolute()}")
+            print(f"Path object criado: {path_obj}")
+            print(f"Absolute path: {path_obj.absolute()}")
             
         except Exception as path_error:
-            print(f"❌ Erro ao criar Path object: {path_error}")
+            print(f"Erro ao criar Path object: {path_error}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Caminho inválido (erro de encoding): {library_path}"
             )
     else:
         path_obj = Path(library_path)
-        print(f"📁 [{method}] Path object criado: {path_obj}")
+        print(f"[{method}] Path object criado: {path_obj}")
     
     if not path_obj.exists():
         if method == "POST":
@@ -228,7 +228,7 @@ def _scan_library_common(library_path: str, method: str = "POST"):
                         path_obj = alt_path
                         library_path = str(alt_path)
                         path_found = True
-                        print(f"✅ Caminho encontrado com encoding alternativo: {library_path}")
+                        print(f"Caminho encontrado com encoding alternativo: {library_path}")
                         break
                 except:
                     continue
@@ -265,8 +265,8 @@ def _scan_library_common(library_path: str, method: str = "POST"):
             detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
         )
     
-    print(f"🔍 [{method}] Escaneando biblioteca: {library_path}")
-    print(f"📂 [{method}] Subpastas encontradas: {len(subdirs)}")
+    print(f"[{method}] Escaneando biblioteca: {library_path}")
+    print(f"[{method}] Subpastas encontradas: {len(subdirs)}")
     
     # Escanear biblioteca usando o scanner real
     library = scanner.scan_library(str(path_obj))
@@ -274,7 +274,7 @@ def _scan_library_common(library_path: str, method: str = "POST"):
     # Converter thumbnails para URLs da API
     for manga in library.mangas:
         if manga.thumbnail:
-            print(f"✅ Mantendo thumbnails como caminhos absolutos")
+            print(f"Mantendo thumbnails como caminhos absolutos")
     
     # Atualizar caminho atual SOMENTE após sucesso
     library_state.current_path = str(path_obj)
@@ -283,7 +283,7 @@ def _scan_library_common(library_path: str, method: str = "POST"):
         # Salvar caminho para próximas execuções
         save_library_path(str(path_obj))
     
-    print(f"✅ [{method}] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
+    print(f"[{method}] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
     
     # Converter para resposta da API
     response_data = {
@@ -324,8 +324,8 @@ async def scan_library_path(library_path: str = Form(...)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Erro ao escanear biblioteca: {str(e)}")
-        print(f"📋 Tipo do erro: {type(e).__name__}")
+        print(f"Erro ao escanear biblioteca: {str(e)}")
+        print(f"Tipo do erro: {type(e).__name__}")
         import traceback
         print(f"📄 Traceback completo:\n{traceback.format_exc()}")
         
@@ -352,7 +352,7 @@ async def scan_library_get(path: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ [GET] Erro ao escanear biblioteca: {str(e)}")
+        print(f"[GET] Erro ao escanear biblioteca: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -384,9 +384,9 @@ async def get_library():
                     if thumbnail_url:
                         print(f"📸 Thumbnail URL criada: {manga.title}")
                     else:
-                        print(f"⚠️ Thumbnail inválida para {manga.title}: {manga.thumbnail}")
+                        print(f"Thumbnail inválida para {manga.title}: {manga.thumbnail}")
                 else:
-                    print(f"❌ Thumbnail não encontrada para {manga.title}: {manga.thumbnail}")
+                    print(f"Thumbnail não encontrada para {manga.title}: {manga.thumbnail}")
                 
                 optimized_manga = {
                     "id": manga.id,
@@ -411,7 +411,7 @@ async def get_library():
             return JSONResponse(content=jsonable_encoder(response_data))
             
         except Exception as e:
-            print(f"❌ Erro ao recarregar biblioteca: {str(e)}")
+            print(f"Erro ao recarregar biblioteca: {str(e)}")
             # Se falhar, limpar caminho
             library_state.clear()
             library_state.clear()
@@ -496,7 +496,7 @@ async def get_manga(manga_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Erro ao buscar mangá {manga_id}: {str(e)}")
+        print(f"Erro ao buscar mangá {manga_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao buscar mangá: {str(e)}"
@@ -540,7 +540,7 @@ async def serve_image(path: str):
         
         # Decodificar URL
         decoded_path = urllib.parse.unquote(path)
-        print(f"🖼️ [IMAGE] Path decodificado: {decoded_path}")
+        print(f"[IMAGE] Path decodificado: {decoded_path}")
         
         # Detectar e corrigir duplo encoding
         if "/api/image?path=" in decoded_path:
@@ -551,7 +551,7 @@ async def serve_image(path: str):
                 query_params = urlparse.parse_qs(parsed.query)
                 if 'path' in query_params:
                     decoded_path = query_params['path'][0]
-                    print(f"✅ [IMAGE] Caminho real extraído: {decoded_path}")
+                    print(f"[IMAGE] Caminho real extraído: {decoded_path}")
                 else:
                     raise HTTPException(status_code=400, detail="Parâmetro 'path' não encontrado")
         
@@ -559,26 +559,26 @@ async def serve_image(path: str):
         file_path = Path(decoded_path).resolve()
         library_root = Path(library_state.current_path).resolve()
         
-        print(f"📁 [IMAGE] Arquivo: {file_path}")
-        print(f"📚 [IMAGE] Biblioteca: {library_root}")
+        print(f"[IMAGE] Arquivo: {file_path}")
+        print(f"[IMAGE] Biblioteca: {library_root}")
         
         # Validar que está dentro da biblioteca
         if not str(file_path).startswith(str(library_root)):
-            print(f"❌ Path fora da biblioteca: {file_path}")
+            print(f"Path fora da biblioteca: {file_path}")
             raise HTTPException(status_code=404, detail="Arquivo não encontrado")
         
         # Validar que existe e é arquivo
         if not file_path.exists() or not file_path.is_file():
-            print(f"❌ Arquivo não encontrado: {file_path}")
+            print(f"Arquivo não encontrado: {file_path}")
             raise HTTPException(status_code=404, detail="Arquivo não encontrado")
         
-        print(f"✅ Servindo imagem: {file_path.name}")
+        print(f"Servindo imagem: {file_path.name}")
         return FileResponse(path=str(file_path))
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Erro inesperado: {e}")
+        print(f"Erro inesperado: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
 @app.get("/api/debug")
@@ -666,7 +666,7 @@ async def clear_cache():
             }
             
     except Exception as e:
-        print(f"❌ Erro ao limpar cache: {str(e)}")
+        print(f"Erro ao limpar cache: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao limpar cache: {str(e)}"
@@ -687,7 +687,7 @@ async def disable_cache():
         }
         
     except Exception as e:
-        print(f"❌ Erro ao desabilitar cache: {str(e)}")
+        print(f"Erro ao desabilitar cache: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao desabilitar cache: {str(e)}"
