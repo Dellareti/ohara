@@ -1,8 +1,7 @@
-from pydantic_settings import BaseSettings
-from pydantic import Field
-from pathlib import Path
 from typing import List
-import os
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Configurações da aplicação"""

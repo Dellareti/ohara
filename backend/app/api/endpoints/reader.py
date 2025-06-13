@@ -1,20 +1,17 @@
-# ARQUIVO COMPLETO CORRIGIDO: backend/app/api/endpoints/reader.py
+import json
+import logging
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
-from typing import Optional, List
-import json
-import re
-from pathlib import Path
-from datetime import datetime
 
 from app.core.services.manga_scanner import MangaScanner
-from app.models.manga import Chapter, Page
+
+logger = logging.getLogger(__name__)
 
 def chapter_to_dict(chapter) -> dict:
-    """
-    Converte um objeto Chapter para dict com serialização adequada de datetime
-    """
     return {
         "id": chapter.id,
         "name": chapter.name,
@@ -49,13 +46,13 @@ def _find_chapter_flexible(manga, chapter_id: str):
     - Por número: "78", "78.0"
     - Por nome parcial: "Chapter 78"
     """
-    
-    print(f"Buscando capítulo: '{chapter_id}'")
+
+    logger.info(f"Buscando capítulo: '{chapter_id}'")
     
     # 1. Busca por ID exato (mais rápida)
     for chapter in manga.chapters:
         if chapter.id == chapter_id:
-            print(f"Encontrado por ID exato: {chapter.id}")
+            logger.info(f"Encontrado por ID exato: {chapter.id}")
             return chapter
     
     # 2. Busca por número do capítulo
@@ -66,10 +63,10 @@ def _find_chapter_flexible(manga, chapter_id: str):
             search_number = float(numbers[0])
             for chapter in manga.chapters:
                 if chapter.number == search_number:
-                    print(f"Encontrado por número: {chapter.number} -> {chapter.id}")
+                    logger.info(f"Encontrado por número: {chapter.number} -> {chapter.id}")
                     return chapter
     except Exception as e:
-        print(f"⚠️ Erro na busca por número: {e}")
+        logger.warning(f"Erro na busca por número: {e}")
     
     # 3. Busca por nome parcial (fallback)
     chapter_id_lower = chapter_id.lower()
@@ -81,7 +78,7 @@ def _find_chapter_flexible(manga, chapter_id: str):
         clean_name = re.sub(r'[^\w\s]', '', chapter_name_lower)
         
         if clean_id in clean_name or clean_name in clean_id:
-            print(f"Encontrado por nome parcial: '{chapter_id}' -> {chapter.id}")
+            logger.info(f"Encontrado por nome parcial: '{chapter_id}' -> {chapter.id}")
             return chapter
     
     # 4. Busca por palavras-chave
@@ -92,14 +89,14 @@ def _find_chapter_flexible(manga, chapter_id: str):
         # Se pelo menos 2 palavras coincidirem
         matches = sum(1 for word in words_in_id if word in chapter_words)
         if matches >= 2:
-            print(f"Encontrado por palavras-chave ({matches} matches): {chapter.id}")
+            logger.info(f"Encontrado por palavras-chave ({matches} matches): {chapter.id}")
             return chapter
     
     # 5. Não encontrado
-    print(f"❌ Capítulo não encontrado: '{chapter_id}'")
-    print(f"📚 Capítulos disponíveis:")
+    logger.warning(f"Capítulo não encontrado: '{chapter_id}'")
+    logger.info(f"Capítulos disponíveis:")
     for i, ch in enumerate(manga.chapters[:5]):  # Mostrar primeiros 5
-        print(f"  {i+1}. ID: '{ch.id}' | Nome: '{ch.name}' | Número: {ch.number}")
+        logger.info(f"  {i+1}. ID: '{ch.id}' | Nome: '{ch.name}' | Número: {ch.number}")
     
     return None
 
@@ -118,12 +115,12 @@ async def get_chapter(manga_id: str, chapter_id: str):
         )
     
     try:
-        print(f"📖 Requisição de capítulo: {manga_id}/{chapter_id}")
+        logger.info(f"Requisição de capítulo: {manga_id}/{chapter_id}")
         
         # Verificar cache primeiro
         cache_key = f"{manga_id}_{chapter_id}"
         if cache_key in _chapter_cache:
-            print(f"📋 Cache hit para capítulo: {chapter_id}")
+            logger.info(f"Cache hit para capítulo: {chapter_id}")
             return _chapter_cache[cache_key]
         
         # Escanear biblioteca para encontrar o capítulo
@@ -157,7 +154,6 @@ async def get_chapter(manga_id: str, chapter_id: str):
         # Converter caminhos das páginas para URLs da API
         chapter_data = chapter_to_dict(chapter)
         for page in chapter_data['pages']:
-            # Corrigir URLs das páginas
             if not page['path'].startswith('/api/image'):
                 page['url'] = f"/api/image?path={page['path']}"
             else:
@@ -179,18 +175,17 @@ async def get_chapter(manga_id: str, chapter_id: str):
             "message": f"Capítulo '{chapter.name}' carregado com sucesso"
         }
         
-        # Salvar no cache
         _chapter_cache[cache_key] = response_data
         
-        print(f"📖 Capítulo carregado: {chapter.name} ({len(chapter.pages)} páginas)")
+        logger.info(f"Capítulo carregado: {chapter.name} ({len(chapter.pages)} páginas)")
         return response_data
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Erro ao carregar capítulo: {str(e)}")
+        logger.error(f"Erro ao carregar capítulo: {str(e)}")
         import traceback
-        print(f"📄 Traceback: {traceback.format_exc()}")
+        logger.info(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao carregar capítulo: {str(e)}"
@@ -251,7 +246,7 @@ async def get_manga_chapters(manga_id: str, limit: int = Query(50, ge=1, le=200)
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Erro ao listar capítulos: {str(e)}")
+        logger.error(f"Erro ao listar capítulos: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao listar capítulos: {str(e)}"
@@ -305,7 +300,7 @@ async def save_reading_progress(
         with open(progress_file, 'w', encoding='utf-8') as f:
             json.dump(progress_data, f, ensure_ascii=False, indent=2)
         
-        print(f"💾 Progresso salvo: {manga_id}/{chapter_id} - Página {current_page}/{total_pages}")
+        logger.info(f"Progresso salvo: {manga_id}/{chapter_id} - Página {current_page}/{total_pages}")
         
         return {
             "message": "Progresso salvo com sucesso",
@@ -313,7 +308,7 @@ async def save_reading_progress(
         }
         
     except Exception as e:
-        print(f"❌ Erro ao salvar progresso: {str(e)}")
+        logger.error(f"Erro ao salvar progresso: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao salvar progresso: {str(e)}"
@@ -349,7 +344,7 @@ async def get_manga_progress(manga_id: str):
         }
         
     except Exception as e:
-        print(f"❌ Erro ao carregar progresso: {str(e)}")
+        logger.error(f"Erro ao carregar progresso: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao carregar progresso: {str(e)}"
@@ -384,7 +379,7 @@ async def get_chapter_progress(manga_id: str, chapter_id: str):
         }
         
     except Exception as e:
-        print(f"❌ Erro ao carregar progresso do capítulo: {str(e)}")
+        logger.error(f"Erro ao carregar progresso do capítulo: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao carregar progresso: {str(e)}"
@@ -392,7 +387,6 @@ async def get_chapter_progress(manga_id: str, chapter_id: str):
 
 # Funções auxiliares
 def _find_previous_chapter(manga, current_chapter):
-    """Encontra o capítulo anterior"""
     chapters = manga.chapters
     for i, chapter in enumerate(chapters):
         if chapter.id == current_chapter.id and i < len(chapters) - 1:
@@ -405,7 +399,6 @@ def _find_previous_chapter(manga, current_chapter):
     return None
 
 def _find_next_chapter(manga, current_chapter):
-    """Encontra o próximo capítulo"""
     chapters = manga.chapters
     for i, chapter in enumerate(chapters):
         if chapter.id == current_chapter.id and i > 0:
@@ -418,7 +411,6 @@ def _find_next_chapter(manga, current_chapter):
     return None
 
 def _get_chapter_index(manga, current_chapter):
-    """Retorna índice do capítulo na lista"""
     for i, chapter in enumerate(manga.chapters):
         if chapter.id == current_chapter.id:
             return {

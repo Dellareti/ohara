@@ -1,23 +1,26 @@
-from fastapi import FastAPI, HTTPException, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.encoders import jsonable_encoder
-from pathlib import Path
+import json
+import logging
+import mimetypes
 import os
 import urllib.parse
-from typing import Optional
-from datetime import datetime
-import mimetypes
 import urllib.parse
-from app.core.services.manga_scanner import MangaScanner
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Form
+from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+
 from app.api.endpoints.reader import router as reader_router
-from app.models.manga import LibraryResponse, MangaResponse
 from app.core.library_state import library_state
+from app.core.services.manga_scanner import MangaScanner
+from app.models.manga import LibraryResponse
+from log_config import log_config
+
+logger = logging.getLogger(__name__)
 
 def manga_to_dict(manga) -> dict:
-    """
-    Converte um objeto Manga para dict com serialização adequada de datetime
-    """
+    """Converte um objeto Manga para dict com serialização adequada de datetime"""
     return {
         "id": manga.id,
         "title": manga.title,
@@ -47,8 +50,6 @@ def manga_to_dict(manga) -> dict:
 
 def create_image_url(file_path: str) -> str:
     """
-    Cria URL limpa para servir imagens
-    
     Args:
         file_path: Caminho absoluto do arquivo
         
@@ -60,39 +61,39 @@ def create_image_url(file_path: str) -> str:
     
     # Se já é uma URL da API, retornar como está
     if file_path.startswith('/api/image'):
-        print(f"URL da API reutilizada: {file_path[:50]}...")
+        logger.info(f"URL da API reutilizada: {file_path[:50]}...")
         return file_path 
     
     # Se é URL externa, retornar como está
     if file_path.startswith('http'):
-        print(f"URL externa detectada: {file_path[:50]}...")
+        logger.info(f"URL externa detectada: {file_path[:50]}...")
         return file_path
     
     # Validar se é um caminho de arquivo válido
     try:
         file_obj = Path(file_path)
         if not file_obj.exists() or not file_obj.is_file():
-            print(f"Arquivo não existe: {file_path}")
+            logger.warning(f"Arquivo não existe: {file_path}")
             return None
             
         # Verificar se é imagem
         mime_type, _ = mimetypes.guess_type(str(file_obj))
         if not mime_type or not mime_type.startswith('image/'):
-            print(f"Não é imagem: {file_path} (MIME: {mime_type})")
+            logger.warning(f"Não é imagem: {file_path} (MIME: {mime_type})")
             return None
             
     except Exception as e:
-        print(f"Erro ao validar arquivo {file_path}: {e}")
+        logger.warning(f"Erro ao validar arquivo {file_path}: {e}")
         return None
     
     # Converter caminho absoluto para URL da API
     try:
         encoded_path = urllib.parse.quote(file_path, safe='')
         clean_url = f"/api/image?path={encoded_path}"
-        print(f"URL criada: {file_obj.name} -> {clean_url[:50]}...")
+        logger.info(f"URL criada: {file_obj.name} -> {clean_url[:50]}...")
         return clean_url
     except Exception as e:
-        print(f"Erro ao criar URL para {file_path}: {e}")
+        logger.warning(f"Erro ao criar URL para {file_path}: {e}")
         return None
 
 # Criar aplicação FastAPI
@@ -139,7 +140,7 @@ async def health_check():
     return {
         "status": "healthy", 
         "service": "ohara-manga-reader",
-        "message": "API funcionando perfeitamente! 🚀"
+        "message": "API funcionando perfeitamente!"
     }
 
 @app.get("/api/test")
@@ -154,16 +155,12 @@ async def test_endpoint():
 
 @app.post("/api/clear-library")
 async def clear_library():
-    """
-    Limpa a biblioteca atual no backend
-    """
     try:
-        print("🧹 Limpando biblioteca no backend...")
+        logger.info("Limpando biblioteca no backend...")
         
-        # Limpar estado da biblioteca
         library_state.clear()
         
-        print("Biblioteca limpa no backend")
+        logger.info("Biblioteca limpa no backend")
         
         return {
             "message": "Biblioteca limpa com sucesso",
@@ -172,7 +169,7 @@ async def clear_library():
         }
         
     except Exception as e:
-        print(f"Erro ao limpar biblioteca: {str(e)}")
+        logger.warning(f"Erro ao limpar biblioteca: {str(e)}")
         return {
             "message": f"Erro ao limpar biblioteca: {str(e)}",
             "status": "error"
@@ -182,36 +179,36 @@ def _scan_library_common(library_path: str, method: str = "POST"):
     """
     Lógica comum para escanear biblioteca (usada por POST e GET)
     """
+
     # Limpar e normalizar o caminho
     library_path = library_path.strip()
     
     # Log para debug
-    print(f"📥 [{method}] Caminho recebido: '{library_path}'")
+    logger.info(f"[{method}] Caminho recebido: '{library_path}'")
     if method == "POST":
-        print(f"📏 Comprimento: {len(library_path)} caracteres")
-        print(f"🔤 Encoding: {library_path.encode('utf-8')}")
+        logger.info(f"Comprimento: {len(library_path)} caracteres")
+        logger.info(f"Encoding: {library_path.encode('utf-8')}")
     
-    # IMPORTANTE: Limpar biblioteca anterior primeiro
     if library_state.current_path != library_path:
-        print(f"🔄 [{method}] Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
+        logger.info(f"[{method}] Mudando biblioteca de '{library_state.current_path}' para '{library_path}'")
         library_state.clear()
     
     # Validar se o caminho existe - com tratamento melhor de Unicode para POST
     if method == "POST":
         try:
             path_obj = Path(library_path)
-            print(f"Path object criado: {path_obj}")
-            print(f"Absolute path: {path_obj.absolute()}")
+            logger.info(f"Path object criado: {path_obj}")
+            logger.info(f"Absolute path: {path_obj.absolute()}")
             
         except Exception as path_error:
-            print(f"Erro ao criar Path object: {path_error}")
+            logger.warning(f"Erro ao criar Path object: {path_error}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Caminho inválido (erro de encoding): {library_path}"
             )
     else:
         path_obj = Path(library_path)
-        print(f"[{method}] Path object criado: {path_obj}")
+        logger.info(f"[{method}] Path object criado: {path_obj}")
     
     if not path_obj.exists():
         if method == "POST":
@@ -228,7 +225,7 @@ def _scan_library_common(library_path: str, method: str = "POST"):
                         path_obj = alt_path
                         library_path = str(alt_path)
                         path_found = True
-                        print(f"Caminho encontrado com encoding alternativo: {library_path}")
+                        logger.info(f"Caminho encontrado com encoding alternativo: {library_path}")
                         break
                 except:
                     continue
@@ -265,16 +262,14 @@ def _scan_library_common(library_path: str, method: str = "POST"):
             detail=f"Pasta não contém subdiretórios (mangás): {library_path}"
         )
     
-    print(f"[{method}] Escaneando biblioteca: {library_path}")
-    print(f"[{method}] Subpastas encontradas: {len(subdirs)}")
+    logger.info(f"[{method}] Escaneando biblioteca: {library_path}")
+    logger.info(f"[{method}] Subpastas encontradas: {len(subdirs)}")
     
-    # Escanear biblioteca usando o scanner real
     library = scanner.scan_library(str(path_obj))
     
-    # Converter thumbnails para URLs da API
     for manga in library.mangas:
         if manga.thumbnail:
-            print(f"Mantendo thumbnails como caminhos absolutos")
+            logger.info(f"Mantendo thumbnails como caminhos absolutos")
     
     # Atualizar caminho atual SOMENTE após sucesso
     library_state.current_path = str(path_obj)
@@ -283,7 +278,7 @@ def _scan_library_common(library_path: str, method: str = "POST"):
         # Salvar caminho para próximas execuções
         save_library_path(str(path_obj))
     
-    print(f"[{method}] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
+    logger.info(f"[{method}] Biblioteca escaneada: {library.total_mangas} mangás encontrados")
     
     # Converter para resposta da API
     response_data = {
@@ -308,8 +303,6 @@ def _scan_library_common(library_path: str, method: str = "POST"):
 @app.post("/api/scan-library")
 async def scan_library_path(library_path: str = Form(...)):
     """
-    Escaneia uma pasta de biblioteca de mangás
-    
     Args:
         library_path: Caminho absoluto para a pasta da biblioteca
     
@@ -324,10 +317,10 @@ async def scan_library_path(library_path: str = Form(...)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Erro ao escanear biblioteca: {str(e)}")
-        print(f"Tipo do erro: {type(e).__name__}")
+        logger.warning(f"Erro ao escanear biblioteca: {str(e)}")
+        logger.warning(f"Tipo do erro: {type(e).__name__}")
         import traceback
-        print(f"📄 Traceback completo:\n{traceback.format_exc()}")
+        logger.info(f"Traceback completo:\n{traceback.format_exc()}")
         
         raise HTTPException(
             status_code=500,
@@ -352,7 +345,7 @@ async def scan_library_get(path: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[GET] Erro ao escanear biblioteca: {str(e)}")
+        logger.warning(f"[GET] Erro ao escanear biblioteca: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -374,19 +367,17 @@ async def get_library():
         try:
             library = scanner.scan_library(library_state.current_path)
             
-            # Criar resposta otimizada COM thumbnails funcionais
             optimized_mangas = []
             for manga in library.mangas:
-                # Verificar se thumbnail existe antes de criar URL
                 thumbnail_url = None
                 if manga.thumbnail:
                     thumbnail_url = create_image_url(manga.thumbnail)
                     if thumbnail_url:
-                        print(f"📸 Thumbnail URL criada: {manga.title}")
+                        logger.info(f"Thumbnail URL criada: {manga.title}")
                     else:
-                        print(f"Thumbnail inválida para {manga.title}: {manga.thumbnail}")
+                        logger.info(f"Thumbnail inválida para {manga.title}: {manga.thumbnail}")
                 else:
-                    print(f"Thumbnail não encontrada para {manga.title}: {manga.thumbnail}")
+                    logger.info(f"Thumbnail não encontrada para {manga.title}: {manga.thumbnail}")
                 
                 optimized_manga = {
                     "id": manga.id,
@@ -411,8 +402,7 @@ async def get_library():
             return JSONResponse(content=jsonable_encoder(response_data))
             
         except Exception as e:
-            print(f"Erro ao recarregar biblioteca: {str(e)}")
-            # Se falhar, limpar caminho
+            logger.warning(f"Erro ao recarregar biblioteca: {str(e)}")
             library_state.clear()
             library_state.clear()
     
@@ -422,7 +412,7 @@ async def get_library():
         "total_mangas": 0,
         "total_chapters": 0,
         "total_pages": 0,
-        "message": "📚 Configure uma biblioteca para começar",
+        "message": "Configure uma biblioteca para começar",
     })
 
 @app.get("/api/manga/{manga_id}")
@@ -439,7 +429,6 @@ async def get_manga(manga_id: str):
         )
     
     try:
-        # Escanear biblioteca real
         library = scanner.scan_library(library_state.current_path)
         manga = library.get_manga(manga_id)
         
@@ -496,7 +485,7 @@ async def get_manga(manga_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Erro ao buscar mangá {manga_id}: {str(e)}")
+        logger.warning(f"Erro ao buscar mangá {manga_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao buscar mangá: {str(e)}"
@@ -531,27 +520,25 @@ async def validate_library_path(path: str):
     
 @app.get("/api/image")
 async def serve_image(path: str):
-    """Serve imagens"""
     try:
-        print(f"[IMAGE] Path recebido: {path}")
+        logger.info(f"[IMAGE] Path recebido: {path}")
         
         if not library_state.current_path:
             raise HTTPException(status_code=400, detail="Biblioteca não configurada")
         
-        # Decodificar URL
         decoded_path = urllib.parse.unquote(path)
-        print(f"[IMAGE] Path decodificado: {decoded_path}")
+        logger.info(f"[IMAGE] Path decodificado: {decoded_path}")
         
         # Detectar e corrigir duplo encoding
         if "/api/image?path=" in decoded_path:
-            print("🔄 [IMAGE] Corrigindo duplo encoding...")
+            logger.info("[IMAGE] Corrigindo duplo encoding...")
             import urllib.parse as urlparse
             parsed = urlparse.urlparse(decoded_path)
             if parsed.query:
                 query_params = urlparse.parse_qs(parsed.query)
                 if 'path' in query_params:
                     decoded_path = query_params['path'][0]
-                    print(f"[IMAGE] Caminho real extraído: {decoded_path}")
+                    logger.info(f"[IMAGE] Caminho real extraído: {decoded_path}")
                 else:
                     raise HTTPException(status_code=400, detail="Parâmetro 'path' não encontrado")
         
@@ -559,26 +546,26 @@ async def serve_image(path: str):
         file_path = Path(decoded_path).resolve()
         library_root = Path(library_state.current_path).resolve()
         
-        print(f"[IMAGE] Arquivo: {file_path}")
-        print(f"[IMAGE] Biblioteca: {library_root}")
+        logger.info(f"[IMAGE] Arquivo: {file_path}")
+        logger.info(f"[IMAGE] Biblioteca: {library_root}")
         
         # Validar que está dentro da biblioteca
         if not str(file_path).startswith(str(library_root)):
-            print(f"Path fora da biblioteca: {file_path}")
+            logger.info(f"Path fora da biblioteca: {file_path}")
             raise HTTPException(status_code=404, detail="Arquivo não encontrado")
         
         # Validar que existe e é arquivo
         if not file_path.exists() or not file_path.is_file():
-            print(f"Arquivo não encontrado: {file_path}")
+            logger.info(f"Arquivo não encontrado: {file_path}")
             raise HTTPException(status_code=404, detail="Arquivo não encontrado")
         
-        print(f"Servindo imagem: {file_path.name}")
+        logger.info(f"Servindo imagem: {file_path.name}")
         return FileResponse(path=str(file_path))
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Erro inesperado: {e}")
+        logger.warning(f"Erro inesperado: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
 @app.get("/api/debug")
@@ -602,16 +589,14 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
+        log_config=log_config,
         log_level="info"
     )
+
 # === ENDPOINTS DE CACHE  ===
 
 @app.get("/api/cache/info")
 async def get_cache_info():
-    """
-    Obter informações sobre o cache da biblioteca atual
-    """
-    
     if not library_state.current_path:
         return {
             "cache_enabled": True,
@@ -639,10 +624,6 @@ async def get_cache_info():
 
 @app.post("/api/cache/clear")
 async def clear_cache():
-    """
-    Limpar cache da biblioteca atual
-    """
-    
     if not library_state.current_path:
         raise HTTPException(
             status_code=400,
@@ -666,7 +647,7 @@ async def clear_cache():
             }
             
     except Exception as e:
-        print(f"Erro ao limpar cache: {str(e)}")
+        logger.warning(f"Erro ao limpar cache: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao limpar cache: {str(e)}"
@@ -674,9 +655,6 @@ async def clear_cache():
 
 @app.post("/api/cache/disable")
 async def disable_cache():
-    """
-    Desabilitar cache híbrido (para debug/troubleshooting)
-    """
     try:
         scanner.disable_cache()
         
@@ -687,7 +665,7 @@ async def disable_cache():
         }
         
     except Exception as e:
-        print(f"Erro ao desabilitar cache: {str(e)}")
+        logger.warning(f"Erro ao desabilitar cache: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao desabilitar cache: {str(e)}"
@@ -695,9 +673,6 @@ async def disable_cache():
 
 @app.post("/api/cache/enable")
 async def enable_cache():
-    """
-    Reabilitar cache híbrido
-    """
     try:
         scanner.enable_cache()
         
@@ -708,7 +683,7 @@ async def enable_cache():
         }
         
     except Exception as e:
-        print(f"❌ Erro ao habilitar cache: {str(e)}")
+        logger.warning(f"Erro ao habilitar cache: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao habilitar cache: {str(e)}"
@@ -716,10 +691,6 @@ async def enable_cache():
 
 @app.get("/api/debug/performance")
 async def debug_performance():
-    """
-    Endpoint de debug para analisar performance do scanner
-    """
-    
     if not library_state.current_path:
         return {
             "error": "Nenhuma biblioteca configurada",
@@ -756,7 +727,7 @@ async def debug_performance():
         }
         
     except Exception as e:
-        print(f"❌ Erro no debug de performance: {str(e)}")
+        logger.warning(f"Erro no debug de performance: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro no debug: {str(e)}"
@@ -764,7 +735,6 @@ async def debug_performance():
     
 @app.get("/api/preview-library")
 async def preview_library(path: str):
-    """Preview dos mangás que seriam encontrados no caminho"""
     try:
         # Validar primeiro
         is_valid, message = scanner.validate_library_path(path)
@@ -814,7 +784,6 @@ async def preview_library(path: str):
 
 @app.post("/api/set-library-path")
 async def set_library_path(data: dict):
-    """Define o caminho da biblioteca"""
     try:
         path = data.get("path")
         if not path:
@@ -825,8 +794,8 @@ async def set_library_path(data: dict):
         if not is_valid:
             return {"success": False, "message": message}
         
-        # Aqui você salvaria a configuração (arquivo, banco, etc.)
-        # Por enquanto, vamos apenas validar
+        # Futuramente será salvo a configuração (arquivo, banco, etc.)
+        # Por enquanto, apenas validação
         return {
             "success": True,
             "message": "Biblioteca configurada com sucesso",
@@ -841,8 +810,6 @@ async def set_library_path(data: dict):
     
 @app.get("/api/debug/thumbnails")
 async def debug_thumbnails():
-    """Debug das thumbnails da biblioteca atual"""
-    
     if not library_state.current_path:
         return {"error": "Nenhuma biblioteca configurada"}
     
@@ -872,10 +839,6 @@ async def debug_thumbnails():
 
 @app.get("/api/debug/reader")
 async def debug_reader_info():
-    """
-    Endpoint de debug para o sistema de leitura
-    """
-    
     debug_info = {
         "library_configured": library_state.current_path is not None,
         "library_path": library_state.current_path,

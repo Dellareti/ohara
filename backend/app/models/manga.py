@@ -1,10 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pathlib import Path
+from typing import List, Optional
+
+from pydantic import BaseModel, Field, ConfigDict
 
 class Page(BaseModel):
-    """Modelo para uma página de mangá"""
     filename: str
     path: str
     size: Optional[int] = None
@@ -12,7 +11,6 @@ class Page(BaseModel):
     height: Optional[int] = None
 
 class Chapter(BaseModel):
-    """Modelo para um capítulo de mangá"""
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -37,7 +35,6 @@ class Chapter(BaseModel):
     date_added: datetime = Field(default_factory=datetime.now)
 
 class Manga(BaseModel):
-    """Modelo para um mangá"""
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -74,7 +71,6 @@ class Manga(BaseModel):
     date_modified: datetime = Field(default_factory=datetime.now)
 
 class Library(BaseModel):
-    """Modelo para a biblioteca de mangás"""
     mangas: List[Manga] = Field(default_factory=list)
     total_mangas: int = Field(0, description="Total de mangás na biblioteca")
     total_chapters: int = Field(0, description="Total de capítulos")
@@ -82,18 +78,14 @@ class Library(BaseModel):
     last_updated: datetime = Field(default_factory=datetime.now)
     
     def add_manga(self, manga: Manga) -> None:
-        """Adiciona um mangá à biblioteca"""
-        # Verifica se já existe
         existing = next((m for m in self.mangas if m.id == manga.id), None)
         if existing:
-            # Atualiza o existente
             self.mangas.remove(existing)
         
         self.mangas.append(manga)
         self._update_stats()
     
     def remove_manga(self, manga_id: str) -> bool:
-        """Remove um mangá da biblioteca"""
         manga = next((m for m in self.mangas if m.id == manga_id), None)
         if manga:
             self.mangas.remove(manga)
@@ -102,16 +94,13 @@ class Library(BaseModel):
         return False
     
     def get_manga(self, manga_id: str) -> Optional[Manga]:
-        """Retorna um mangá pelo ID"""
         return next((m for m in self.mangas if m.id == manga_id), None)
     
     def search(self, query: str) -> List[Manga]:
-        """Busca mangás por título"""
         query = query.lower()
         return [m for m in self.mangas if query in m.title.lower()]
     
     def _update_stats(self) -> None:
-        """Atualiza estatísticas da biblioteca"""
         self.total_mangas = len(self.mangas)
         self.total_chapters = sum(m.chapter_count for m in self.mangas)
         self.total_pages = sum(m.total_pages for m in self.mangas)
@@ -119,16 +108,13 @@ class Library(BaseModel):
 
 # Modelos de Request/Response para API
 class LibraryResponse(BaseModel):
-    """Response da API para biblioteca"""
     library: Library
     message: str = "Success"
 
 class MangaResponse(BaseModel):
-    """Response da API para mangá específico"""
     manga: Manga
     message: str = "Success"
 
 class ChapterResponse(BaseModel):
-    """Response da API para capítulo específico"""
     chapter: Chapter
     message: str = "Success"

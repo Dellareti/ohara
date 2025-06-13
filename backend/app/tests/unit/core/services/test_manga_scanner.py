@@ -9,9 +9,6 @@ import pytest
 from app.core.services.manga_scanner import MangaScanner
 from app.models.manga import Chapter, Library
 
-pytestmark = [pytest.mark.unit, pytest.mark.scanner]
-
-
 @pytest.fixture
 def library_directory():
     directory = tempfile.mkdtemp()

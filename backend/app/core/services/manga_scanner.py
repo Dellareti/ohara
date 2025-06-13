@@ -11,7 +11,6 @@ from typing import List, Optional, Dict, Tuple
 from app.core.config import get_settings, SUPPORTED_IMAGE_EXTENSIONS, CHAPTER_PATTERNS
 from app.models.manga import Manga, Chapter, Page, Library
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MangaScanner:
