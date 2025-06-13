@@ -53,6 +53,8 @@
 
 - [ ] **Cache híbrido complexo demais** para o caso de uso atual
   - **Avaliação**: Verificar se simplicidade não seria melhor
+- [ ] **Resolver problema de conectividade** do npm run preview com backend
+  - **Avaliação**: O problema é que a configuração de proxy do Vite apenas funciona no modo de desenvolvimento (npm run dev). No modo preview (npm run preview), o proxy não é aplicado, então o frontend tenta acessar diretamente http://localhost:8000 sem o proxy.
 
 ### Frontend
 
@@ -100,5 +102,8 @@
 - [ ] **Continuar Leitura** 
   - **Status**: Parcialmente implementado, precisa melhorar
 
-- [ ] **Cinfigurações gerais** 
+- [ ] **Configurações gerais** 
+  - **Status**: Parcialmente implementado, precisa melhorar
+
+- [ ] **Botão Navegar** 
   - **Status**: Parcialmente implementado, precisa melhorar
