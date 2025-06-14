@@ -27,7 +27,7 @@ Sistema web para leitura de mangás organizados localmente. O Ohara escaneia est
 - FastAPI - Framework web moderno para Python
 - Uvicorn - Servidor ASGI de alta performance
 - Pydantic - Validação de dados e serialização
-- Python 3.13+ - Linguagem de programação
+- Python 3.10+ - Linguagem de programação
 
 **Outras tecnologias:**
 - JSON - Armazenamento de dados e cache
@@ -37,7 +37,7 @@ Sistema web para leitura de mangás organizados localmente. O Ohara escaneia est
 ## Como Executar o Projeto
 **Pré-requisitos**
 
-Python 3.13+ instalado
+Python 3.10+ instalado
 
 Node.js 18+ e npm instalados
 
