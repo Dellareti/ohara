@@ -113,13 +113,13 @@ export const useReaderStore = defineStore('reader', {
       this.error = null
       
       try {
-        console.log(`📖 Carregando capítulo: ${mangaId}/${chapterId}`)
+        console.log(`Carregando capítulo: ${mangaId}/${chapterId}`)
         
         // 1. Carregar dados do capítulo
         const response = await axios.get(`${API_BASE_URL}/api/manga/${mangaId}/chapter/${chapterId}`)
         const data = response.data
         
-        console.log('📊 Dados recebidos do backend:', data)
+        console.log('Dados recebidos do backend:', data)
         
         // 2. Atualizar estado básico
         this.currentManga = data.manga
@@ -155,13 +155,13 @@ export const useReaderStore = defineStore('reader', {
     // Método para carregar navegação entre capítulos
     async loadChapterNavigation(mangaId, currentChapterId) {
       try {
-        console.log(`🧭 Carregando navegação para: ${mangaId}/${currentChapterId}`)
+        console.log(`Carregando navegação para: ${mangaId}/${currentChapterId}`)
         
         // Buscar lista de todos os capítulos do mangá
         const chaptersResponse = await axios.get(`${API_BASE_URL}/api/manga/${mangaId}/chapters`)
         const chaptersData = chaptersResponse.data
         
-        console.log('📚 Lista de capítulos recebida:', chaptersData)
+        console.log('Lista de capítulos recebida:', chaptersData)
         
         if (!chaptersData.chapters || !Array.isArray(chaptersData.chapters)) {
           console.warn('Lista de capítulos inválida')
@@ -184,9 +184,9 @@ export const useReaderStore = defineStore('reader', {
           currentChapterId.includes(ch.id)
         )
         
-        console.log(`🎯 Capítulo atual encontrado no índice: ${currentIndex}`)
+        console.log(`Capítulo atual encontrado no índice: ${currentIndex}`)
         console.log(`Procurando por ID: "${currentChapterId}"`)
-        console.log('📋 IDs disponíveis:', allChapters.map(ch => ch.id))
+        console.log('IDs disponíveis:', allChapters.map(ch => ch.id))
         
         if (currentIndex === -1) {
           console.warn('Capítulo atual não encontrado na lista')
@@ -291,7 +291,7 @@ export const useReaderStore = defineStore('reader', {
         allChapters: allChapters
       };
       
-      console.log('🧭 Navegação configurada:', {
+      console.log('Navegação configurada:', {
         current: currentIndex + 1,
         total: total,
         previous: this.navigation.previousChapter?.name,
@@ -308,7 +308,7 @@ export const useReaderStore = defineStore('reader', {
         if (progressData) {
           this.currentPage = progressData.current_page || 0
           this.readingProgress[chapterId] = progressData
-          console.log(`📊 Progresso carregado: página ${this.currentPage + 1}/${this.totalPages}`)
+          console.log(`Progresso carregado: página ${this.currentPage + 1}/${this.totalPages}`)
         } else {
           this.currentPage = 0
         }
@@ -335,10 +335,10 @@ export const useReaderStore = defineStore('reader', {
         // Atualizar cache local
         this.readingProgress[chapterId] = response.data.progress
         
-        console.log(`💾 Progresso salvo: ${this.currentPage + 1}/${this.totalPages}`)
+        console.log(`Progresso salvo: ${this.currentPage + 1}/${this.totalPages}`)
         
       } catch (error) {
-        console.error('❌ Erro ao salvar progresso:', error)
+        console.error('Erro ao salvar progresso:', error)
       }
     },
 

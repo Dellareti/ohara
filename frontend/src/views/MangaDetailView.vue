@@ -325,7 +325,7 @@ export default {
       error.value = null
       
       try {
-        console.log('📖 Carregando mangá:', mangaId.value)
+        console.log('Carregando mangá:', mangaId.value)
         const mangaData = await libraryStore.fetchManga(mangaId.value)
 
         manga.value = {
@@ -351,7 +351,7 @@ export default {
     }
 
     const refreshChapters = async () => {
-      console.log('🔄 Atualizando capítulos...')
+      console.log('Atualizando capítulos...')
       await loadManga()
     }
 
@@ -384,7 +384,7 @@ export default {
     }
 
     const openChapter = (chapter) => {
-      console.log('📖 Abrindo capítulo:', chapter.name)
+      console.log('Abrindo capítulo:', chapter.name)
       currentChapterId.value = chapter.id
       saveReadingProgress()
       

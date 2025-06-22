@@ -97,6 +97,8 @@
 - [ ] **Comentários de código** em funções complexas
   - **Foco**: MangaScanner, funções de parsing
 
+- [ ] **Mover a pasta testes** para a pasta raiz e tira-lá da pasta app, pois o padrão python é testes na pasta raiz
+
 ## Novas Funcinonalidades 
 
 - [ ] **Continuar Leitura** 

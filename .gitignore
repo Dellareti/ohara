@@ -23,6 +23,12 @@ __pycache__/
 .Python
 .pytest_cache/
 
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
 # Database
 *.db
 *.sqlite

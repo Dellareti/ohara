@@ -70,7 +70,7 @@ export const useLibraryStore = defineStore('library', {
     async checkBackendStatus() {
       try {
         this.backendOnline = await apiUtils.isBackendOnline()
-        console.log('🌐 Backend status:', this.backendOnline ? 'Online' : 'Offline')
+        console.log('Backend status:', this.backendOnline ? 'Online' : 'Offline')
         return this.backendOnline
       } catch (error) {
         this.backendOnline = false
@@ -82,7 +82,7 @@ export const useLibraryStore = defineStore('library', {
     // Limpar biblioteca no backend
     async clearBackendLibrary() {
       try {
-        console.log('🧹 Limpando biblioteca no backend...')
+        console.log('Limpando biblioteca no backend...')
         const response = await fetch('http://localhost:8000/api/clear-library', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
@@ -136,8 +136,8 @@ export const useLibraryStore = defineStore('library', {
           // Salvar configuração no localStorage
           this.saveLibraryConfig()
           
-          console.log(`📚 Biblioteca escaneada: ${this.mangas.length} mangás`)
-          console.log('📊 Response message:', data.message)
+          console.log(`Biblioteca escaneada: ${this.mangas.length} mangás`)
+          console.log('Response message:', data.message)
           return true
         } else {
           throw new Error(data.message || 'Erro ao escanear biblioteca')
@@ -157,7 +157,7 @@ export const useLibraryStore = defineStore('library', {
     async fetchLibrary(forceRefresh = false) {
       // Se já foi inicializado e cache é válido, não recarregar
       if (this.isInitialized && !forceRefresh && this.isCacheValid && this.mangas.length > 0) {
-        console.log('📋 Cache válido, usando dados em memória')
+        console.log('Cache válido, usando dados em memória')
         return { mangas: this.mangas }
       }
       
@@ -167,7 +167,7 @@ export const useLibraryStore = defineStore('library', {
       this.error = null
       
       try {
-        console.log('📚 Carregando biblioteca do servidor...')
+        console.log('Carregando biblioteca do servidor...')
         
         const response = await libraryAPI.getLibrary()
         const data = response.data
@@ -215,7 +215,7 @@ export const useLibraryStore = defineStore('library', {
       this.error = null
       
       try {
-        console.log('📖 Carregando mangá:', mangaId)
+        console.log('Carregando mangá:', mangaId)
         
         const response = await libraryAPI.getManga(mangaId)
         const data = response.data
@@ -236,7 +236,7 @@ export const useLibraryStore = defineStore('library', {
 
     // Atualizar biblioteca atual (força refresh)
     async refreshLibrary() {
-      console.log('🔄 Forçando atualização da biblioteca...')
+      console.log('Forçando atualização da biblioteca...')
       
       if (this.libraryPath) {
         // Se tem biblioteca configurada, fazer scan
@@ -263,7 +263,7 @@ export const useLibraryStore = defineStore('library', {
 
     // Limpar biblioteca completamente
     async clearLibrary() {
-      console.log('🗑️ Limpando biblioteca completamente...')
+      console.log('Limpando biblioteca completamente...')
       
       // 1. Limpar estado local
       this.mangas = []
@@ -338,7 +338,7 @@ export const useLibraryStore = defineStore('library', {
           localStorage.setItem('ohara_library_path', this.libraryPath)
           localStorage.setItem('ohara_last_load', this.lastLoadTime?.toString() || '')
           localStorage.setItem('ohara_last_updated', this.lastUpdated?.toISOString() || '')
-          console.log('💾 Configuração salva no localStorage')
+          console.log('Configuração salva no localStorage')
         }
       } catch (error) {
         console.warn('Erro ao salvar no localStorage:', error)
@@ -360,7 +360,7 @@ export const useLibraryStore = defineStore('library', {
           if (savedLastUpdated) {
             this.lastUpdated = new Date(savedLastUpdated)
           }
-          console.log('📂 Configuração carregada do localStorage:', savedPath)
+          console.log('Configuração carregada do localStorage:', savedPath)
           return savedPath
         }
       } catch (error) {
@@ -385,7 +385,7 @@ export const useLibraryStore = defineStore('library', {
           localStorage.removeItem(key)
         })
         
-        console.log('🗑️ Configuração limpa do localStorage')
+        console.log('Configuração limpa do localStorage')
       } catch (error) {
         console.warn('Erro ao limpar localStorage:', error)
       }
@@ -395,11 +395,11 @@ export const useLibraryStore = defineStore('library', {
     async initialize() {
       // Evitar múltiplas inicializações
       if (this.isInitialized) {
-        console.log('🛑 Store já inicializado, usando cache')
+        console.log('Store já inicializado, usando cache')
         return
       }
       
-      console.log('🚀 Inicializando biblioteca store...')
+      console.log('Inicializando biblioteca store...')
       
       // Verificar backend
       await this.checkBackendStatus()
@@ -414,7 +414,7 @@ export const useLibraryStore = defineStore('library', {
       
       // Se tem dados em cache válidos, usar eles
       if (savedPath && this.isCacheValid && this.mangas.length > 0) {
-        console.log('📋 Usando dados em cache válidos')
+        console.log('Usando dados em cache válidos')
         this.isInitialized = true
         return
       }
@@ -425,7 +425,7 @@ export const useLibraryStore = defineStore('library', {
         
         // Se carregou biblioteca vazia e tem caminho salvo, tentar reescanear
         if (this.mangas.length === 0 && savedPath) {
-          console.log('📂 Tentando reescanear biblioteca salva:', savedPath)
+          console.log('Tentando reescanear biblioteca salva:', savedPath)
           try {
             await this.scanLibrary()
           } catch (error) {

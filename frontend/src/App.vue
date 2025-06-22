@@ -47,11 +47,11 @@ export default {
           console.log('Sistema online')
         } else {
           isConnected.value = false
-          console.log('❌ Sistema com erro:', response.status)
+          console.log('Sistema com erro:', response.status)
         }
       } catch (error) {
         isConnected.value = false
-        console.log('❌ Sistema offline:', error.message)
+        console.log('Sistema offline:', error.message)
       }
     }
     
