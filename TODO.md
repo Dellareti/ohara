@@ -37,9 +37,18 @@
   - **Arquivos**: `App.vue:42-56`, `api.js:3`
   - **Solução**: Usar variáveis de ambiente (`.env`)
 
-- [ ] **Logs excessivos** prejudicando performance
-  - **Impacto**: Logs desnecessários em produção
-  - **Solução**: Sistema de logging estruturado com níveis (DEBUG, INFO, ERROR)
+- [ ] **Refatorar console.log para sistema de logging adequado**
+  - **Problema**: 54 console.log espalhados pelo frontend (12 arquivos)
+  - **Impacto**: Logs aparecem em produção, prejudicam performance e profissionalismo
+  - **Detalhamento**:
+    - 28 logs de debug/desenvolvimento para remover
+    - 14 logs de sistema para converter em tratamento de erro
+    - 12 logs de ação do usuário para manter (convertidos para logger.info)
+    - Maior concentração em `store/library.js` (23 logs)
+  - **Solução**: 
+    - Criar `utils/logger.js` com níveis debug/info/error
+    - Implementar logging condicional para desenvolvimento
+    - Remover logs de debug desnecessários
 
 - [ ] **Falta validação robusta** de entrada em endpoints
   - **Impacto**: Possíveis erros não tratados
