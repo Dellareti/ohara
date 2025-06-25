@@ -17,7 +17,6 @@ export default {
     
     const testClick = () => {
       clicked.value = true
-      console.log('Vue.js funcionando!')
     }
     
     return {

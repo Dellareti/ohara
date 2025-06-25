@@ -19,7 +19,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => {
-          console.log(`Proxy: ${path} -> http://localhost:8000${path}`)
           return path
         }
       }

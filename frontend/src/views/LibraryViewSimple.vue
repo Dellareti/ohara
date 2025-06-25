@@ -253,7 +253,6 @@ export default {
     }
 
     const selectManga = (manga) => {
-      console.log('Mangá selecionado:', manga.title)
       
       router.push({
         name: 'MangaDetail',

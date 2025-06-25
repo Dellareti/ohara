@@ -386,7 +386,6 @@ export default {
 
     const onImageLoad = () => {
       imageLoading.value = false
-      console.log('Imagem carregada')
     }
 
     const onImageError = (event) => {

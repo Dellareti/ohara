@@ -10,6 +10,12 @@
   - **Solução**: ✅ Implementado usando variáveis de ambiente (`.env`)
   - **Status**: Criados arquivos `.env` e `.env.example` com `VITE_API_BASE_URL`
 
+- [x] **Refatorar console.log para sistema de logging adequado**
+  - **Problema**: 54 console.log espalhados pelo frontend (12 arquivos)
+  - **Solução**: ✅ Removidos todos os console.log desnecessários
+  - **Status**: 35 console.log convertidos em comentários 
+  - **Arquivos**: `store/library.js` (20 logs), `store/reader.js` (15 logs)
+
 
 ## Problemas de Alta Urgência
 
@@ -35,19 +41,6 @@
 - [ ] **Função create_image_url muito longa** (48 linhas em main.py:19-67)
   - **Solução**: Quebrar em funções menores: `_validate_image_path()`, `_create_api_url()`
 
-
-- [ ] **Refatorar console.log para sistema de logging adequado**
-  - **Problema**: 54 console.log espalhados pelo frontend (12 arquivos)
-  - **Impacto**: Logs aparecem em produção, prejudicam performance e profissionalismo
-  - **Detalhamento**:
-    - 28 logs de debug/desenvolvimento para remover
-    - 14 logs de sistema para converter em tratamento de erro
-    - 12 logs de ação do usuário para manter (convertidos para logger.info)
-    - Maior concentração em `store/library.js` (23 logs)
-  - **Solução**: 
-    - Criar `utils/logger.js` com níveis debug/info/error
-    - Implementar logging condicional para desenvolvimento
-    - Remover logs de debug desnecessários
 
 ## Problemas de Baixa Urgência
 

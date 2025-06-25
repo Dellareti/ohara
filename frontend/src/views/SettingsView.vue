@@ -317,7 +317,6 @@ export default {
         // Mostrar feedback
         alert('Configurações salvas com sucesso!')
         
-        console.log('Configurações salvas:', settings)
       } catch (error) {
         console.error('Erro ao salvar configurações:', error)
         alert('❌ Erro ao salvar configurações')
@@ -378,7 +377,6 @@ export default {
         link.download = 'ohara_settings.json'
         link.click()
         
-        console.log('Configurações exportadas')
       } catch (error) {
         console.error('Erro ao exportar configurações:', error)
         alert('❌ Erro ao exportar configurações')

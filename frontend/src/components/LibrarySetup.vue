@@ -202,7 +202,6 @@ export default {
         await libraryStore.setLibraryPath(libraryPath.value)
         
         // 2. Depois, escanear usando POST com FormData
-        console.log('Iniciando scan da biblioteca...')
         
         const formData = new FormData()
         formData.append('library_path', libraryPath.value)
@@ -225,9 +224,7 @@ export default {
           libraryStore.totalChapters = data.library.total_chapters || 0
           libraryStore.totalPages = data.library.total_pages || 0
           libraryStore.isInitialized = true
-          
-          console.log('Biblioteca configurada e escaneada:', data.message)
-          
+                    
           // Redirecionar para biblioteca
           router.push('/library')
         } else {

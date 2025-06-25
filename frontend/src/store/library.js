@@ -70,7 +70,6 @@ export const useLibraryStore = defineStore('library', {
     async checkBackendStatus() {
       try {
         this.backendOnline = await apiUtils.isBackendOnline()
-        console.log('Backend status:', this.backendOnline ? 'Online' : 'Offline')
         return this.backendOnline
       } catch (error) {
         this.backendOnline = false
@@ -82,14 +81,13 @@ export const useLibraryStore = defineStore('library', {
     // Limpar biblioteca no backend
     async clearBackendLibrary() {
       try {
-        console.log('Limpando biblioteca no backend...')
         const response = await fetch('http://localhost:8000/api/clear-library', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         })
         
         if (response.ok) {
-          console.log('Backend limpo com sucesso')
+          // Backend limpo com sucesso
         } else {
           console.warn('Erro ao limpar backend:', response.status)
         }
@@ -104,7 +102,6 @@ export const useLibraryStore = defineStore('library', {
         throw new Error('Caminho da biblioteca não configurado')
       }
       
-      console.log('Escaneando biblioteca:', this.libraryPath)
       this.loading = true
       this.scanning = true
       this.error = null
@@ -136,8 +133,6 @@ export const useLibraryStore = defineStore('library', {
           // Salvar configuração no localStorage
           this.saveLibraryConfig()
           
-          console.log(`Biblioteca escaneada: ${this.mangas.length} mangás`)
-          console.log('Response message:', data.message)
           return true
         } else {
           throw new Error(data.message || 'Erro ao escanear biblioteca')
@@ -157,7 +152,7 @@ export const useLibraryStore = defineStore('library', {
     async fetchLibrary(forceRefresh = false) {
       // Se já foi inicializado e cache é válido, não recarregar
       if (this.isInitialized && !forceRefresh && this.isCacheValid && this.mangas.length > 0) {
-        console.log('Cache válido, usando dados em memória')
+        // Cache válido, usando dados em memória
         return { mangas: this.mangas }
       }
       
@@ -167,7 +162,7 @@ export const useLibraryStore = defineStore('library', {
       this.error = null
       
       try {
-        console.log('Carregando biblioteca do servidor...')
+        // Carregando biblioteca do servidor...
         
         const response = await libraryAPI.getLibrary()
         const data = response.data
@@ -193,10 +188,7 @@ export const useLibraryStore = defineStore('library', {
           this.saveLibraryConfig()
         }
         
-        console.log('Biblioteca carregada:', {
-          mangas: this.totalMangas,
-          fromCache: false
-        })
+        // Biblioteca carregada
         
         return data
         
@@ -215,14 +207,14 @@ export const useLibraryStore = defineStore('library', {
       this.error = null
       
       try {
-        console.log('Carregando mangá:', mangaId)
+        // Carregando mangá
         
         const response = await libraryAPI.getManga(mangaId)
         const data = response.data
         
         this.currentManga = data.manga || data
         
-        console.log('Mangá carregado:', this.currentManga.title)
+        // Mangá carregado
         return this.currentManga
         
       } catch (error) {
@@ -236,7 +228,7 @@ export const useLibraryStore = defineStore('library', {
 
     // Atualizar biblioteca atual (força refresh)
     async refreshLibrary() {
-      console.log('Forçando atualização da biblioteca...')
+      // Forçando atualização da biblioteca...
       
       if (this.libraryPath) {
         // Se tem biblioteca configurada, fazer scan
@@ -263,7 +255,7 @@ export const useLibraryStore = defineStore('library', {
 
     // Limpar biblioteca completamente
     async clearLibrary() {
-      console.log('Limpando biblioteca completamente...')
+      // Limpando biblioteca completamente...
       
       // 1. Limpar estado local
       this.mangas = []
@@ -283,12 +275,12 @@ export const useLibraryStore = defineStore('library', {
       // 3. Notificar backend para limpar cache
       await this.clearBackendLibrary()
       
-      console.log('Biblioteca limpa completamente')
+      // Biblioteca limpa completamente
     },
 
     // Configurar caminho da biblioteca
     async setLibraryPath(path) {
-      console.log('Configurando caminho da biblioteca:', path)
+      // Configurando caminho da biblioteca
       
       try {
         // Validar caminho primeiro
@@ -319,7 +311,7 @@ export const useLibraryStore = defineStore('library', {
           // Salvar no localStorage
           this.saveLibraryConfig()
           
-          console.log('Biblioteca configurada:', data.message)
+          // Biblioteca configurada
           return true
         } else {
           throw new Error(data.message)
@@ -338,7 +330,7 @@ export const useLibraryStore = defineStore('library', {
           localStorage.setItem('ohara_library_path', this.libraryPath)
           localStorage.setItem('ohara_last_load', this.lastLoadTime?.toString() || '')
           localStorage.setItem('ohara_last_updated', this.lastUpdated?.toISOString() || '')
-          console.log('Configuração salva no localStorage')
+          // Configuração salva no localStorage
         }
       } catch (error) {
         console.warn('Erro ao salvar no localStorage:', error)
@@ -360,7 +352,7 @@ export const useLibraryStore = defineStore('library', {
           if (savedLastUpdated) {
             this.lastUpdated = new Date(savedLastUpdated)
           }
-          console.log('Configuração carregada do localStorage:', savedPath)
+          // Configuração carregada do localStorage
           return savedPath
         }
       } catch (error) {
@@ -385,7 +377,7 @@ export const useLibraryStore = defineStore('library', {
           localStorage.removeItem(key)
         })
         
-        console.log('Configuração limpa do localStorage')
+        // Configuração limpa do localStorage
       } catch (error) {
         console.warn('Erro ao limpar localStorage:', error)
       }
@@ -395,11 +387,11 @@ export const useLibraryStore = defineStore('library', {
     async initialize() {
       // Evitar múltiplas inicializações
       if (this.isInitialized) {
-        console.log('Store já inicializado, usando cache')
+        // Store já inicializado, usando cache
         return
       }
       
-      console.log('Inicializando biblioteca store...')
+      // Inicializando biblioteca store...
       
       // Verificar backend
       await this.checkBackendStatus()
@@ -414,7 +406,7 @@ export const useLibraryStore = defineStore('library', {
       
       // Se tem dados em cache válidos, usar eles
       if (savedPath && this.isCacheValid && this.mangas.length > 0) {
-        console.log('Usando dados em cache válidos')
+        // Usando dados em cache válidos
         this.isInitialized = true
         return
       }
@@ -425,7 +417,7 @@ export const useLibraryStore = defineStore('library', {
         
         // Se carregou biblioteca vazia e tem caminho salvo, tentar reescanear
         if (this.mangas.length === 0 && savedPath) {
-          console.log('Tentando reescanear biblioteca salva:', savedPath)
+          // Tentando reescanear biblioteca salva
           try {
             await this.scanLibrary()
           } catch (error) {
@@ -444,7 +436,7 @@ export const useLibraryStore = defineStore('library', {
     // Validar caminho de biblioteca
     async validatePath(path) {
       try {
-        console.log('Validando caminho:', path)
+        // Validando caminho
         
         // Validação local primeiro
         const localValidation = apiUtils.validatePathFormat(path)
@@ -471,7 +463,7 @@ export const useLibraryStore = defineStore('library', {
     // Preview dos mangás que seriam encontrados
     async previewLibrary(path) {
       try {
-        console.log('Fazendo preview da biblioteca:', path)
+        // Fazendo preview da biblioteca
         
         const response = await fetch(`http://localhost:8000/api/preview-library?path=${encodeURIComponent(path)}`)
         const data = await response.json()
