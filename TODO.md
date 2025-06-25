@@ -1,5 +1,16 @@
 # TODO - Melhorias do Projeto Ohara
 
+## Resolvidas
+
+- [x] **Botão Navegar** 
+  - **Status**: Ao implementar utilizando o system file do SO trouxe muitos problemas de navegação e o browser, por medidads de segurança, impede o acesso as pastas. Portanto, preferimos manter a seleção do path como método tradicional para biblioteca.
+
+- [x] **URLs hardcoded** no frontend
+  - **Arquivos**: `App.vue:44`, `api.js:3`
+  - **Solução**: ✅ Implementado usando variáveis de ambiente (`.env`)
+  - **Status**: Criados arquivos `.env` e `.env.example` com `VITE_API_BASE_URL`
+
+
 ## Problemas de Alta Urgência
 
 - [ ] **Arquivo main.py muito grande** com 1034 linhas e múltiplas responsabilidades
@@ -24,9 +35,6 @@
 - [ ] **Função create_image_url muito longa** (48 linhas em main.py:19-67)
   - **Solução**: Quebrar em funções menores: `_validate_image_path()`, `_create_api_url()`
 
-- [ ] **URLs hardcoded** no frontend
-  - **Arquivos**: `App.vue:42-56`, `api.js:3`
-  - **Solução**: Usar variáveis de ambiente (`.env`)
 
 - [ ] **Refatorar console.log para sistema de logging adequado**
   - **Problema**: 54 console.log espalhados pelo frontend (12 arquivos)
@@ -76,5 +84,3 @@
 - [ ] **Configurações gerais** 
   - **Status**: Parcialmente implementado, precisa melhorar
 
-- [ ] **Botão Navegar** 
-  - **Status**: Parcialmente implementado, precisa melhorar

@@ -16,23 +16,14 @@
 
         <div class="input-section">
           <label for="libraryPath">Caminho da Biblioteca:</label>
-          <div class="input-group">
-            <input
-              id="libraryPath"
-              v-model="libraryPath"
-              type="text"
-              placeholder="/home/user/Biblioteca ou C:\Mangas"
-              class="path-input"
-              @input="validatePathDebounced"
-            />
-            <button 
-              @click="browseFolder" 
-              class="browse-btn"
-              title="Selecionar pasta"
-            >
-              📁 Navegar
-            </button>
-          </div>
+          <input
+            id="libraryPath"
+            v-model="libraryPath"
+            type="text"
+            placeholder="/home/user/Biblioteca ou C:\Mangas"
+            class="path-input"
+            @input="validatePathDebounced"
+          />
           
           <!-- Status de Validação -->
           <div v-if="validation.checked" class="validation-status">
@@ -200,10 +191,6 @@ export default {
       }
     }
     
-    const browseFolder = () => {
-      // TODO
-      alert('Ainda a ser implementado')
-    }
     
     const configureLibrary = async () => {
       if (!validation.value.valid) return
@@ -280,7 +267,6 @@ export default {
       previousLibrary,
       isConfiguring,
       validatePathDebounced,
-      browseFolder,
       configureLibrary,
       usePreviousLibrary
     }
@@ -347,41 +333,20 @@ export default {
   color: #fff;
 }
 
-.input-group {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
 .path-input {
-  flex: 1;
+  width: 100%;
   padding: 15px;
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.3);
   color: white;
   font-size: 1rem;
+  margin-bottom: 15px;
 }
 
 .path-input:focus {
   outline: none;
   border-color: #4ecdc4;
-}
-
-.browse-btn {
-  padding: 15px 25px;
-  background: linear-gradient(45deg, #4ecdc4, #44a08d);
-  border: none;
-  border-radius: 10px;
-  color: white;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: transform 0.2s ease;
-}
-
-.browse-btn:hover {
-  transform: scale(1.05);
 }
 
 .validation-status {
