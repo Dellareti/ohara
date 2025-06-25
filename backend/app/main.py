@@ -517,7 +517,7 @@ async def validate_library_path(path: str):
             "is_directory": False,
             "readable": False
         }
-    
+
 @app.get("/api/image")
 async def serve_image(path: str):
     try:
