@@ -12,9 +12,9 @@
 
     <!-- Error State -->
     <div v-if="error || readerStore.error" class="reader-error">
-      <h2>❌ Erro ao Carregar Capítulo</h2>
+      <h2>Erro ao Carregar Capítulo</h2>
       <p>{{ error || readerStore.error }}</p>
-      <button @click="loadChapter" class="retry-btn">🔄 Tentar Novamente</button>
+      <button @click="loadChapter" class="retry-btn">Tentar Novamente</button>
     </div>
 
     <!-- Reader Content -->
@@ -22,7 +22,7 @@
       <!-- Header Controls -->
       <div class="reader-header" :class="{ 'hidden': readerStore.hideControls }">
         <div class="header-left">
-          <button @click="goBack" class="control-btn">← Voltar</button>
+          <button @click="goBack" class="control-btn back-btn">Voltar</button>
           <div class="chapter-info">
             <h3>{{ readerStore.currentManga?.title || 'Carregando...' }}</h3>
             <p>{{ readerStore.currentChapter?.chapter?.name || 'Carregando...' }}</p>
@@ -53,45 +53,6 @@
           />
         </div>
 
-        <!-- Modo Página Dupla -->
-        <div v-else-if="readerStore.readingMode === 'double'" class="double-page-container">
-          <div class="double-pages" :class="`direction-${readerStore.readingDirection}`">
-            <template v-if="readerStore.readingDirection === 'rtl'">
-              <img 
-                v-if="currentDoublePage + 1 < readerStore.totalPages"
-                :src="getPageImageUrl(currentDoublePage + 1)"
-                :alt="`Página ${currentDoublePage + 2}`"
-                class="manga-page right-page"
-                :class="`fit-${readerStore.fitMode}`"
-                @error="handleImageError"
-              />
-              <img 
-                :src="getPageImageUrl(currentDoublePage)"
-                :alt="`Página ${currentDoublePage + 1}`"
-                class="manga-page left-page"
-                :class="`fit-${readerStore.fitMode}`"
-                @error="handleImageError"
-              />
-            </template>
-            <template v-else>
-              <img 
-                :src="getPageImageUrl(currentDoublePage)"
-                :alt="`Página ${currentDoublePage + 1}`"
-                class="manga-page left-page"
-                :class="`fit-${readerStore.fitMode}`"
-                @error="handleImageError"
-              />
-              <img 
-                v-if="currentDoublePage + 1 < readerStore.totalPages"
-                :src="getPageImageUrl(currentDoublePage + 1)"
-                :alt="`Página ${currentDoublePage + 2}`"
-                class="manga-page right-page"
-                :class="`fit-${readerStore.fitMode}`"
-                @error="handleImageError"
-              />
-            </template>
-          </div>
-        </div>
 
         <!-- Modo Vertical -->
         <div v-else-if="readerStore.readingMode === 'vertical'" class="vertical-container">
@@ -113,25 +74,6 @@
           </div>
         </div>
 
-        <!-- Modo Webtoon -->
-        <div v-else-if="readerStore.readingMode === 'webtoon'" class="webtoon-container">
-          <div class="webtoon-pages">
-            <div 
-              v-for="pageIndex in readerStore.totalPages" 
-              :key="pageIndex"
-              class="webtoon-page-wrapper"
-            >
-              <img 
-                :src="getPageImageUrl(pageIndex - 1)"
-                :alt="`Página ${pageIndex}`"
-                class="manga-page webtoon-page"
-                :class="`fit-${readerStore.fitMode}`"
-                @error="handleImageError"
-                loading="lazy"
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Footer Controls -->
@@ -154,11 +96,9 @@
           <button @click="previousPage" :disabled="!canGoPrevious" class="control-btn">
             ⏪ Anterior
           </button>
-          <select v-model="readerStore.readingMode" class="mode-select">
-            <option value="single">📄 Página Única</option>
-            <option value="double">📖 Página Dupla</option>
-            <option value="vertical">📜 Vertical</option>
-            <option value="webtoon">📱 Webtoon</option>
+          <select :value="readerStore.readingMode" @change="changeReadingMode($event.target.value)" class="mode-select">
+            <option value="single">Horizontal</option>
+            <option value="vertical">Vertical</option>
           </select>
           <button @click="nextPage" :disabled="!canGoNext" class="control-btn">
             Próxima ⏩
@@ -191,13 +131,6 @@
             </select>
           </div>
 
-          <div class="setting-group">
-            <label class="setting-label">Direção de Leitura:</label>
-            <select v-model="readerStore.readingDirection" class="setting-select">
-              <option value="ltr">Esquerda → Direita</option>
-              <option value="rtl">Direita → Esquerda</option>
-            </select>
-          </div>
 
           <div class="setting-group">
             <label class="setting-label">Tema:</label>
@@ -247,9 +180,6 @@ export default {
       return readerStore.progressPercentage || 0
     })
 
-    const currentDoublePage = computed(() => {
-      return Math.floor(readerStore.currentPage / 2) * 2
-    })
 
     const canGoPrevious = computed(() => {
       return readerStore.currentPage > 0
@@ -322,8 +252,8 @@ export default {
     }
 
     const nextPage = () => {
-      if (readerStore.readingMode === 'vertical' || readerStore.readingMode === 'webtoon') {
-        const container = document.querySelector('.vertical-container, .webtoon-container')
+      if (readerStore.readingMode === 'vertical') {
+        const container = document.querySelector('.vertical-container')
         if (container) {
           container.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' })
         }
@@ -338,8 +268,8 @@ export default {
     }
 
     const previousPage = () => {
-      if (readerStore.readingMode === 'vertical' || readerStore.readingMode === 'webtoon') {
-        const container = document.querySelector('.vertical-container, .webtoon-container')
+      if (readerStore.readingMode === 'vertical') {
+        const container = document.querySelector('.vertical-container')
         if (container) {
           container.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' })
         }
@@ -473,6 +403,10 @@ export default {
       readerStore.showSettings = false
     }
 
+    const changeReadingMode = (mode) => {
+      readerStore.setReadingMode(mode)
+    }
+
     // Keyboard shortcuts
     const handleKeydown = (event) => {
       if (readerStore.showSettings) return
@@ -559,7 +493,6 @@ export default {
       loading,
       error,
       progressPercentage,
-      currentDoublePage,
       canGoPrevious,
       canGoNext,
       hasPreviousChapter,
@@ -579,7 +512,8 @@ export default {
       seekToPosition,
       goBack,
       resetSettings,
-      applySettings
+      applySettings,
+      changeReadingMode
     }
   }
 }
@@ -609,7 +543,6 @@ export default {
 /* Theme Variations */
 .manga-reader.theme-light {
   background: #fff;
-  color: #000;
 }
 
 .manga-reader.theme-sepia {
@@ -664,7 +597,7 @@ export default {
   top: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+  background: rgba(0,0,0,0.9);
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
@@ -701,6 +634,7 @@ export default {
   border-radius: 15px;
   font-size: 0.9rem;
   font-weight: 500;
+  color: white;
 }
 
 .control-btn {
@@ -724,6 +658,13 @@ export default {
   cursor: not-allowed;
 }
 
+.control-btn.back-btn {
+  background: white;
+  color: black;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
 /* Page Viewer */
 .page-viewer {
   position: relative;
@@ -744,35 +685,16 @@ export default {
   height: 100%;
 }
 
-/* Double Page Mode */
-.double-page-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-}
-
-.double-pages {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  max-height: 100vh;
-}
-
-.double-pages.direction-rtl {
-  flex-direction: row-reverse;
-}
 
 /* Vertical Mode */
-.vertical-container, .webtoon-container {
+.vertical-container {
   width: 100%;
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.vertical-pages, .webtoon-pages {
+.vertical-pages {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -781,10 +703,6 @@ export default {
 
 .vertical-page-wrapper {
   margin-bottom: 10px;
-}
-
-.webtoon-page-wrapper {
-  margin-bottom: 20px;
 }
 
 /* Image Fitting */
@@ -826,7 +744,7 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+  background: rgba(0,0,0,0.9);
   padding: 1rem 2rem;
   z-index: 100;
   transition: transform 0.3s ease;
@@ -998,46 +916,32 @@ export default {
 }
 
 .primary-btn {
-  border-color: #4ecdc4;
-  background: #4ecdc4;
+  background-color:#3BAF41;
   color: white;
-}
-
-.primary-btn:hover {
-  background: #44a08d;
-  border-color: #44a08d;
+  border: none;
 }
 
 .secondary-btn {
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.2);
-  color: #ff6b6b;
-}
-
-.secondary-btn:hover {
-  background: #ff6b6b;
+  background-color: #E53935;
   color: white;
+  border: none;
 }
 
 /* Scrollbar customization */
-.vertical-container::-webkit-scrollbar,
-.webtoon-container::-webkit-scrollbar {
+.vertical-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.vertical-container::-webkit-scrollbar-track,
-.webtoon-container::-webkit-scrollbar-track {
+.vertical-container::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.vertical-container::-webkit-scrollbar-thumb,
-.webtoon-container::-webkit-scrollbar-thumb {
+.vertical-container::-webkit-scrollbar-thumb {
   background: #4ecdc4;
   border-radius: 4px;
 }
 
-.vertical-container::-webkit-scrollbar-thumb:hover,
-.webtoon-container::-webkit-scrollbar-thumb:hover {
+.vertical-container::-webkit-scrollbar-thumb:hover {
   background: #44a08d;
 }
 
@@ -1063,10 +967,6 @@ export default {
   .control-btn {
     padding: 0.4rem 0.8rem;
     font-size: 0.9rem;
-  }
-  
-  .double-pages {
-    gap: 5px;
   }
   
   .manga-page.fit-width {

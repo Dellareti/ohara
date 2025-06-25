@@ -44,10 +44,10 @@
       <router-link to="/setup" class="setup-link">⚙️ Configurar Agora</router-link>
     </div>
 
-    <!-- Grid de Mangás (usando sortedMangas) -->
-    <div v-if="!libraryStore.loading && !libraryStore.error && sortedMangas.length > 0" class="manga-grid">
+    <!-- Grid de Mangás (usando paginatedMangas) -->
+    <div v-if="!libraryStore.loading && !libraryStore.error && sortedMangas.length > 0" :class="['manga-grid', cardSizeClass]">
       <div 
-        v-for="manga in sortedMangas" 
+        v-for="manga in paginatedMangas" 
         :key="manga.id"
         class="manga-card"
         @click="selectManga(manga)"
@@ -80,7 +80,37 @@
           </div>
         </div>
       </div>
-    </div>  
+    </div>
+
+    <!-- Controles de Paginação -->
+    <div v-if="!libraryStore.loading && !libraryStore.error && totalPages > 1" class="pagination">
+      <button @click="prevPage" :disabled="currentPage <= 1" class="page-btn">« Anterior</button>
+      
+      <div class="page-numbers">
+        <button 
+          v-for="page in Math.min(5, totalPages)" 
+          :key="page"
+          @click="goToPage(page)"
+          :class="['page-number', { active: currentPage === page }]"
+        >
+          {{ page }}
+        </button>
+        <span v-if="totalPages > 5" class="page-ellipsis">...</span>
+        <button 
+          v-if="totalPages > 5"
+          @click="goToPage(totalPages)"
+          :class="['page-number', { active: currentPage === totalPages }]"
+        >
+          {{ totalPages }}
+        </button>
+      </div>
+      
+      <button @click="nextPage" :disabled="currentPage >= totalPages" class="page-btn">Próxima »</button>
+      
+      <div class="page-info">
+        Página {{ currentPage }} de {{ totalPages }} ({{ sortedMangas.length }} mangás)
+      </div>
+    </div>
   </div>
 </template>
 
@@ -89,6 +119,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ErrorState from '@/components/ErrorState.vue'
 import { useLibraryStore } from '@/store/library'
+import { useSettingsStore } from '@/store/settings'
 
 export default {
   name: 'LibraryViewSimple',
@@ -98,7 +129,9 @@ export default {
   setup() {
     const router = useRouter()
     const libraryStore = useLibraryStore()
+    const settingsStore = useSettingsStore()
     const sortOption = ref('alphabetical')
+    const currentPage = ref(1)
 
     // Função de ordenação natural (números antes de letras, mas mantendo ordem lógica)
     const naturalSort = (a, b) => {
@@ -215,12 +248,29 @@ export default {
     })
 
     // Computed para estatísticas
-    const totalPages = computed(() => {
+    const totalMangaPages = computed(() => {
       return sortedMangas.value.reduce((sum, manga) => sum + (manga.total_pages || 0), 0)
     })
 
     const totalChapters = computed(() => {
       return sortedMangas.value.reduce((sum, manga) => sum + (manga.chapter_count || 0), 0)
+    })
+
+    // Computed para paginação
+    const paginatedMangas = computed(() => {
+      const itemsPerPage = settingsStore.interface.itemsPerPage
+      const startIndex = (currentPage.value - 1) * itemsPerPage
+      const endIndex = startIndex + itemsPerPage
+      return sortedMangas.value.slice(startIndex, endIndex)
+    })
+
+    const totalPages = computed(() => {
+      return Math.ceil(sortedMangas.value.length / settingsStore.interface.itemsPerPage)
+    })
+
+    // Computed para classes de tamanho de card
+    const cardSizeClass = computed(() => {
+      return `card-size-${settingsStore.interface.cardSize}`
     })
 
     // Methods
@@ -287,6 +337,30 @@ export default {
       }
     }
 
+    // Métodos de paginação
+    const nextPage = () => {
+      if (currentPage.value < totalPages.value) {
+        currentPage.value++
+      }
+    }
+
+    const prevPage = () => {
+      if (currentPage.value > 1) {
+        currentPage.value--
+      }
+    }
+
+    const goToPage = (page) => {
+      if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page
+      }
+    }
+
+    // Reset página quando filtro mudar
+    watch(sortOption, () => {
+      currentPage.value = 1
+    })
+
     // Watch para salvar preferência quando mudar
     watch(sortOption, () => {
       saveSortPreference()
@@ -295,6 +369,7 @@ export default {
     // Lifecycle
     onMounted(async () => {
       loadSortPreference()
+      settingsStore.loadSettings()
       libraryStore.loadLibraryConfig()
       
       if (libraryStore.libraryPath) {
@@ -306,16 +381,23 @@ export default {
 
     return {
       libraryStore,
+      settingsStore,
       sortOption,
       sortedMangas,
+      paginatedMangas,
       totalPages,
       totalChapters,
+      currentPage,
+      cardSizeClass,
       loadLibrary,
       refreshLibrary,
       selectManga,
       getThumbnailUrl,
       onImageError,
-      formatPages
+      formatPages,
+      nextPage,
+      prevPage,
+      goToPage
     }
   }
 }
@@ -626,6 +708,121 @@ export default {
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 20px;
     padding: 20px;
+  }
+}
+
+/* Tamanhos de Cards */
+.manga-grid.card-size-small {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.manga-grid.card-size-medium {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.manga-grid.card-size-large {
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+}
+
+.manga-grid.card-size-small .manga-thumbnail {
+  height: 250px;
+}
+
+.manga-grid.card-size-medium .manga-thumbnail {
+  height: 300px;
+}
+
+.manga-grid.card-size-large .manga-thumbnail {
+  height: 400px;
+}
+
+/* Paginação */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.05);
+  margin: 20px 30px;
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.page-btn {
+  background: rgba(78, 205, 196, 0.2);
+  border: 2px solid #4ecdc4;
+  color: #4ecdc4;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #4ecdc4;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.page-number {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 40px;
+}
+
+.page-number:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.page-number.active {
+  background: #4ecdc4;
+  border-color: #4ecdc4;
+  color: white;
+  font-weight: bold;
+}
+
+.page-ellipsis {
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0 10px;
+}
+
+.page-info {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  margin-left: 20px;
+}
+
+@media (max-width: 768px) {
+  .pagination {
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 10px;
+    padding: 20px;
+  }
+  
+  .page-info {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+    margin-top: 10px;
   }
 }
 </style>

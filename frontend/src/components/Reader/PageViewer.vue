@@ -32,47 +32,8 @@
         </div>
       </div>
       
-      <!-- Navigation zones -->
-      <div class="nav-zones" :class="`zones-${touchZones}`">
-        <div class="nav-zone previous" @click.stop="$emit('previous-page')"></div>
-        <div class="nav-zone menu" @click.stop="$emit('toggle-controls')"></div>
-        <div class="nav-zone next" @click.stop="$emit('next-page')"></div>
-      </div>
     </div>
 
-    <!-- Double Page Mode -->
-    <div v-if="readingMode === 'double'" class="double-page-container">
-      <div class="page-wrapper left" :class="{ 'rtl': readingDirection === 'rtl' }">
-        <img
-          v-if="leftPageData"
-          :src="leftPageData.url"
-          :alt="`Página ${leftPageIndex + 1}`"
-          class="page-image"
-          :style="pageImageStyle"
-          @load="onImageLoad"
-          @error="onImageError"
-        />
-      </div>
-      
-      <div class="page-wrapper right" :class="{ 'rtl': readingDirection === 'rtl' }">
-        <img
-          v-if="rightPageData"
-          :src="rightPageData.url"
-          :alt="`Página ${rightPageIndex + 1}`"
-          class="page-image"
-          :style="pageImageStyle"
-          @load="onImageLoad"
-          @error="onImageError"
-        />
-      </div>
-      
-      <!-- Navigation zones for double page -->
-      <div class="nav-zones double">
-        <div class="nav-zone previous" @click.stop="$emit('previous-page')"></div>
-        <div class="nav-zone menu" @click.stop="$emit('toggle-controls')"></div>
-        <div class="nav-zone next" @click.stop="$emit('next-page')"></div>
-      </div>
-    </div>
 
     <!-- Vertical Continuous Mode -->
     <div v-if="readingMode === 'vertical'" class="vertical-container" ref="verticalContainer">
@@ -93,24 +54,6 @@
       </div>
     </div>
 
-    <!-- Webtoon Mode -->
-    <div v-if="readingMode === 'webtoon'" class="webtoon-container" ref="webtoonContainer">
-      <div 
-        v-for="(page, index) in visiblePages" 
-        :key="page.url"
-        class="webtoon-page"
-        :data-page-index="index"
-      >
-        <img
-          :src="page.url"
-          :alt="`Página ${index + 1}`"
-          class="page-image webtoon"
-          :style="webtoonPageStyle"
-          @load="onImageLoad"
-          @error="onImageError"
-        />
-      </div>
-    </div>
 
     <!-- Page transition effects -->
     <transition name="page-fade">
@@ -144,8 +87,6 @@ export default {
     totalPages: Number,
     readingMode: String,
     fitMode: String,
-    readingDirection: String,
-    touchZones: String,
     theme: String,
     isFullscreen: Boolean
   },
@@ -162,7 +103,6 @@ export default {
     // Reactive data
     const viewerContainer = ref(null)
     const verticalContainer = ref(null)
-    const webtoonContainer = ref(null)
     const imageLoading = ref(false)
     const pageTransition = ref(null)
     const zoomLevel = ref(1)
@@ -208,103 +148,18 @@ export default {
       marginBottom: '1rem'
     }))
 
-    const webtoonPageStyle = computed(() => ({
-      width: '100%',
-      height: 'auto',
-      display: 'block',
-      marginBottom: '2rem'
-    }))
 
-    // Double page logic
-    const leftPageData = computed(() => {
-      if (props.readingDirection === 'rtl') {
-        return props.nextPageData || props.currentPageData
-      } else {
-        return props.currentPageData
-      }
-    })
-
-    const rightPageData = computed(() => {
-      if (props.readingDirection === 'rtl') {
-        return props.currentPageData
-      } else {
-        return props.nextPageData
-      }
-    })
-
-    const leftPageIndex = computed(() => {
-      if (props.readingDirection === 'rtl') {
-        return props.currentPage + 1
-      } else {
-        return props.currentPage
-      }
-    })
-
-    const rightPageIndex = computed(() => {
-      if (props.readingDirection === 'rtl') {
-        return props.currentPage
-      } else {
-        return props.currentPage + 1
-      }
-    })
 
     // Methods
     const handleClick = (event) => {
-      if (props.readingMode === 'vertical' || props.readingMode === 'webtoon') {
-        return // Não usar cliques em modos de scroll
+      if (props.readingMode === 'vertical') {
+        return // Não usar cliques em modo scroll
       }
 
-      const rect = viewerContainer.value.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
-      const width = rect.width
-      const height = rect.height
-
-      // Determinar zona de clique
-      let zone = 'menu'
-      
-      switch (props.touchZones) {
-        case 'edge':
-          if (x < width * 0.15) zone = 'previous'
-          else if (x > width * 0.85) zone = 'next'
-          else zone = 'menu'
-          break
-        case 'kindle':
-          if (x < width * 0.25) zone = 'previous'
-          else if (x > width * 0.75) zone = 'next'
-          else zone = 'menu'
-          break
-        case 'l-shape':
-          if (x < width * 0.5 || y < height * 0.25) zone = 'previous'
-          else zone = 'next'
-          break
-        case 'split':
-          zone = x < width * 0.5 ? 'previous' : 'next'
-          break
-      }
-
-      // Executar ação baseada na direção de leitura
-      executeZoneAction(zone)
+      // Clique simples no centro da tela para toggle de controles
+      emit('toggle-controls')
     }
 
-    const executeZoneAction = (zone) => {
-      if (zone === 'menu') {
-        emit('toggle-controls')
-        return
-      }
-
-      // Ajustar para direção de leitura
-      if (props.readingDirection === 'rtl') {
-        if (zone === 'previous') emit('next-page')
-        else if (zone === 'next') emit('previous-page')
-      } else {
-        if (zone === 'previous') emit('previous-page')
-        else if (zone === 'next') emit('next-page')
-      }
-
-      // Mostrar efeito de transição
-      showPageTransition(zone)
-    }
 
     const showPageTransition = (direction) => {
       pageTransition.value = direction
@@ -348,19 +203,11 @@ export default {
       // Swipe mínimo: 50px em menos de 300ms
       if (deltaTime < 300 && Math.abs(deltaX) > 50) {
         if (deltaX > 0) {
-          // Swipe para direita
-          if (props.readingDirection === 'rtl') {
-            emit('next-page')
-          } else {
-            emit('previous-page')
-          }
+          // Swipe para direita = página anterior
+          emit('previous-page')
         } else {
-          // Swipe para esquerda
-          if (props.readingDirection === 'rtl') {
-            emit('previous-page')
-          } else {
-            emit('next-page')
-          }
+          // Swipe para esquerda = próxima página
+          emit('next-page')
         }
         
         showPageTransition(deltaX > 0 ? 'previous' : 'next')
@@ -396,11 +243,11 @@ export default {
       event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm8gYW8gY2FycmVnYXI8L3RleHQ+PC9zdmc+'
     }
 
-    // Scroll handling for vertical modes
+    // Scroll handling for vertical mode
     const handleVerticalScroll = () => {
-      if (props.readingMode !== 'vertical' && props.readingMode !== 'webtoon') return
+      if (props.readingMode !== 'vertical') return
 
-      const container = props.readingMode === 'vertical' ? verticalContainer.value : webtoonContainer.value
+      const container = verticalContainer.value
       if (!container) return
 
       // Determinar página atual baseada no scroll
@@ -426,10 +273,10 @@ export default {
     watch(() => props.currentPage, (newPage) => {
       imageLoading.value = true
       
-      // Auto-scroll em modo vertical
-      if ((props.readingMode === 'vertical' || props.readingMode === 'webtoon') && newPage >= 0) {
+      // Auto-navegação em modo vertical
+      if (props.readingMode === 'vertical' && newPage >= 0) {
         nextTick(() => {
-          const container = props.readingMode === 'vertical' ? verticalContainer.value : webtoonContainer.value
+          const container = verticalContainer.value
           const pageElement = container?.querySelector(`[data-page-index="${newPage}"]`)
           
           if (pageElement) {
@@ -441,34 +288,30 @@ export default {
 
     // Lifecycle
     onMounted(() => {
-      // Adicionar listeners para scroll em modos verticais
-      if (props.readingMode === 'vertical' || props.readingMode === 'webtoon') {
-        const container = props.readingMode === 'vertical' ? verticalContainer.value : webtoonContainer.value
+      // Adicionar listeners para scroll em modo vertical
+      if (props.readingMode === 'vertical') {
+        const container = verticalContainer.value
         container?.addEventListener('scroll', handleVerticalScroll)
       }
     })
 
     onUnmounted(() => {
       // Remover listeners
-      const container = props.readingMode === 'vertical' ? verticalContainer.value : webtoonContainer.value
-      container?.removeEventListener('scroll', handleVerticalScroll)
+      if (props.readingMode === 'vertical') {
+        const container = verticalContainer.value
+        container?.removeEventListener('scroll', handleVerticalScroll)
+      }
     })
 
     return {
       viewerContainer,
       verticalContainer,
-      webtoonContainer,
       imageLoading,
       pageTransition,
       zoomLevel,
       panOffset,
       pageImageStyle,
       verticalPageStyle,
-      webtoonPageStyle,
-      leftPageData,
-      rightPageData,
-      leftPageIndex,
-      rightPageIndex,
       handleClick,
       handleWheel,
       handleTouchStart,
@@ -533,26 +376,7 @@ export default {
   transition: transform 0.2s ease;
 }
 
-/* Double page mode */
-.double-page-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 1rem;
-}
 
-.page-wrapper.left,
-.page-wrapper.right {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.page-wrapper.rtl {
-  order: -1;
-}
 
 /* Vertical mode */
 .vertical-container {
@@ -574,83 +398,7 @@ export default {
   height: auto;
 }
 
-/* Webtoon mode */
-.webtoon-container {
-  height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-behavior: smooth;
-  max-width: 600px;
-  margin: 0 auto;
-}
 
-.webtoon-page {
-  margin-bottom: 2rem;
-}
-
-.page-image.webtoon {
-  width: 100%;
-  height: auto;
-}
-
-/* Navigation zones */
-.nav-zones {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  pointer-events: none;
-}
-
-.nav-zone {
-  pointer-events: all;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-/* Zone layouts */
-.nav-zones.zones-edge {
-  flex-direction: row;
-}
-.nav-zones.zones-edge .nav-zone.previous { flex: 0 0 15%; }
-.nav-zones.zones-edge .nav-zone.menu { flex: 1; }
-.nav-zones.zones-edge .nav-zone.next { flex: 0 0 15%; }
-
-.nav-zones.zones-kindle {
-  flex-direction: row;
-}
-.nav-zones.zones-kindle .nav-zone.previous { flex: 0 0 25%; }
-.nav-zones.zones-kindle .nav-zone.menu { flex: 1; }
-.nav-zones.zones-kindle .nav-zone.next { flex: 0 0 25%; }
-
-.nav-zones.zones-split {
-  flex-direction: row;
-}
-.nav-zones.zones-split .nav-zone.previous { flex: 1; }
-.nav-zones.zones-split .nav-zone.next { flex: 1; }
-.nav-zones.zones-split .nav-zone.menu { display: none; }
-
-.nav-zones.zones-l-shape {
-  flex-direction: column;
-}
-.nav-zones.zones-l-shape .nav-zone.previous { flex: 0 0 25%; width: 50%; }
-.nav-zones.zones-l-shape .nav-zone.next { flex: 1; }
-.nav-zones.zones-l-shape .nav-zone.menu { display: none; }
-
-/* Hover effects for navigation zones */
-.nav-zone:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-/* Double page navigation */
-.nav-zones.double {
-  flex-direction: row;
-}
-.nav-zones.double .nav-zone.previous { flex: 0 0 20%; }
-.nav-zones.double .nav-zone.menu { flex: 1; }
-.nav-zones.double .nav-zone.next { flex: 0 0 20%; }
 
 /* Loading state */
 .image-loading {

@@ -1248,23 +1248,23 @@ export default {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.90rem;
   font-weight: 500;
   transition: all 0.2s;
 }
 
 .read-btn {
-  background: #4CAF50;
+  background: #3BAF41;;
   color: white;
 }
 
 .unread-btn {
-  background: #FF9800;
+  background: #D98E04;
   color: white;
 }
 
 .cancel-btn {
-  background: rgba(255, 255, 255, 0.1);
+  background: #E53935;
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }

@@ -21,6 +21,21 @@
 
 - [x] **Continuar Leitura** 
   - **Status**: **IMPLEMENTADO**
+  
+- [x] **Documentação da API** usando OpenAPI/Swagger
+  - **Solução**: Adicionadas tags organizacionais, descrições detalhadas, exemplos e metadados completos
+  - **Status**: **IMPLEMENTADO**
+
+- [x] **README.md** com instruções de setup e desenvolvimento
+  - **Solução**: Expandido com arquitetura, endpoints, troubleshooting, performance e guia de contribuição
+  - **Status**: **IMPLEMENTADO**
+
+- [x] **Comentários de código** em funções complexas
+  - **Solução**: Docstrings detalhadas na classe MangaScanner e métodos principais de parsing
+  - **Status**: **IMPLEMENTADO**
+
+  - [x] **Configurações gerais** 
+  - **Status**: **IMPLEMENTADO**
 
 ## Problemas de Alta Urgência
 
@@ -48,18 +63,4 @@
 
 ## Documentação
 
-- [ ] **Documentação da API** usando OpenAPI/Swagger
-  - **Status**: Parcialmente implementado, precisa melhorar
-
-- [ ] **README.md** com instruções de setup e desenvolvimento
-  - **Impacto**: Facilita onboarding de novos desenvolvedores
-
-- [ ] **Comentários de código** em funções complexas
-  - **Foco**: MangaScanner, funções de parsing
-
 - [ ] **Mover a pasta testes** para a pasta raiz e tira-lá da pasta app, pois o padrão python é testes na pasta raiz
-
-## Novas Funcinonalidades 
-
-- [ ] **Configurações gerais** 
-  - **Status**: Parcialmente implementado, precisa melhorar

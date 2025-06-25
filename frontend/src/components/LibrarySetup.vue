@@ -457,7 +457,7 @@ export default {
 .configure-btn {
   flex: 1;
   padding: 15px 30px;
-  background: linear-gradient(45deg, #4ecdc4, #44a08d);
+  background: #3BAF41;
   border: none;
   border-radius: 10px;
   color: white;

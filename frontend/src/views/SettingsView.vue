@@ -3,8 +3,6 @@
     <div class="settings-header">
       <h1>Configurações do Sistema</h1>
       <p>Personalize sua experiência de leitura e configurações gerais</p>
-      <br>
-      <p>(Em Implementação)</p>
     </div>
 
     <div class="settings-content">
@@ -14,17 +12,21 @@
         <div class="settings-grid">
           <div class="setting-item">
             <label>Modo de Leitura Padrão:</label>
-            <select v-model="readerSettings.defaultReadingMode" class="setting-input">
-              <option value="single">Página Única</option>
-              <option value="double">Página Dupla</option>
-              <option value="vertical">Vertical</option>
-              <option value="webtoon">Webtoon</option>
+            <select 
+              :value="readerStore.readingMode" 
+              @change="updateReaderSetting('readingMode', $event.target.value)"
+              class="setting-input">
+              <option value="single">Página Única (Horizontal)</option>
+              <option value="vertical">Vertical (Scroll)</option>
             </select>
           </div>
 
           <div class="setting-item">
             <label>Ajuste de Imagem Padrão:</label>
-            <select v-model="readerSettings.defaultFitMode" class="setting-input">
+            <select 
+              :value="readerStore.fitMode" 
+              @change="updateReaderSetting('fitMode', $event.target.value)"
+              class="setting-input">
               <option value="width">Ajustar Largura</option>
               <option value="height">Ajustar Altura</option>
               <option value="screen">Ajustar Tela</option>
@@ -32,47 +34,20 @@
             </select>
           </div>
 
-          <div class="setting-item">
-            <label>Direção de Leitura:</label>
-            <select v-model="readerSettings.defaultDirection" class="setting-input">
-              <option value="rtl">Direita → Esquerda (Mangá)</option>
-              <option value="ltr">Esquerda → Direita (HQ)</option>
-            </select>
-          </div>
 
           <div class="setting-item">
             <label>Tema Padrão:</label>
-            <select v-model="readerSettings.defaultTheme" class="setting-input">
+            <select 
+              :value="readerStore.theme" 
+              @change="updateReaderSetting('theme', $event.target.value)"
+              class="setting-input">
               <option value="dark">Escuro</option>
               <option value="light">Claro</option>
               <option value="sepia">Sépia</option>
             </select>
           </div>
 
-          <div class="setting-item">
-            <label>Zonas de Toque:</label>
-            <select v-model="readerSettings.defaultTouchZones" class="setting-input">
-              <option value="edge">Bordas</option>
-              <option value="kindle">Estilo Kindle</option>
-              <option value="l-shape">Formato L</option>
-              <option value="split">Dividido</option>
-            </select>
-          </div>
 
-          <div class="setting-item">
-            <label>Auto-scroll Padrão (segundos):</label>
-            <div class="range-container">
-              <input 
-                type="range" 
-                v-model.number="readerSettings.defaultAutoScroll" 
-                min="0" 
-                max="10" 
-                step="0.5"
-                class="range-input"
-              />
-              <span class="range-value">{{ readerSettings.defaultAutoScroll || 'Desativado' }}</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -82,7 +57,10 @@
         <div class="settings-grid">
           <div class="setting-item">
             <label>Tamanho dos Cards da Biblioteca:</label>
-            <select v-model="interfaceSettings.cardSize" class="setting-input">
+            <select 
+              :value="settingsStore.interface.cardSize" 
+              @change="updateInterfaceSetting('cardSize', $event.target.value)"
+              class="setting-input">
               <option value="small">Pequeno</option>
               <option value="medium">Médio</option>
               <option value="large">Grande</option>
@@ -91,33 +69,16 @@
 
           <div class="setting-item">
             <label>Itens por Página:</label>
-            <select v-model="interfaceSettings.itemsPerPage" class="setting-input">
-              <option value="20">20 items</option>
-              <option value="50">50 items</option>
-              <option value="100">100 items</option>
+            <select 
+              :value="settingsStore.interface.itemsPerPage" 
+              @change="updateInterfaceSetting('itemsPerPage', Number($event.target.value))"
+              class="setting-input">
+              <option :value="20">20 items</option>
+              <option :value="50">50 items</option>
+              <option :value="100">100 items</option>
             </select>
           </div>
 
-          <div class="setting-item checkbox-item">
-            <label>
-              <input type="checkbox" v-model="interfaceSettings.showThumbnails" />
-              Mostrar Thumbnails dos Mangás
-            </label>
-          </div>
-
-          <div class="setting-item checkbox-item">
-            <label>
-              <input type="checkbox" v-model="interfaceSettings.showProgress" />
-              Mostrar Progresso de Leitura
-            </label>
-          </div>
-
-          <div class="setting-item checkbox-item">
-            <label>
-              <input type="checkbox" v-model="interfaceSettings.darkMode" />
-              Modo Escuro Global
-            </label>
-          </div>
         </div>
       </div>
 
@@ -127,36 +88,67 @@
         <div class="settings-grid">
           <div class="setting-item">
             <label>Cache de Imagens (MB):</label>
-            <select v-model="performanceSettings.cacheSize" class="setting-input">
-              <option value="50">50 MB</option>
-              <option value="100">100 MB</option>
-              <option value="200">200 MB</option>
-              <option value="500">500 MB</option>
+            <select 
+              :value="settingsStore.performance.cacheSize" 
+              @change="updatePerformanceSetting('cacheSize', Number($event.target.value))"
+              class="setting-input">
+              <option :value="50">50 MB</option>
+              <option :value="100">100 MB</option>
+              <option :value="200">200 MB</option>
+              <option :value="500">500 MB</option>
             </select>
           </div>
 
           <div class="setting-item">
             <label>Pré-carregamento de Páginas:</label>
-            <select v-model="performanceSettings.preloadPages" class="setting-input">
-              <option value="1">1 página</option>
-              <option value="3">3 páginas</option>
-              <option value="5">5 páginas</option>
-              <option value="10">10 páginas</option>
+            <select 
+              :value="settingsStore.performance.preloadPages" 
+              @change="updatePerformanceSetting('preloadPages', Number($event.target.value))"
+              class="setting-input">
+              <option :value="1">1 página</option>
+              <option :value="3">3 páginas</option>
+              <option :value="5">5 páginas</option>
+              <option :value="10">10 páginas</option>
+            </select>
+          </div>
+
+          <div class="setting-item">
+            <label>Max Cache do Reader:</label>
+            <select 
+              :value="settingsStore.performance.maxCacheSize" 
+              @change="updatePerformanceSetting('maxCacheSize', Number($event.target.value))"
+              class="setting-input">
+              <option :value="25">25 páginas</option>
+              <option :value="50">50 páginas</option>
+              <option :value="100">100 páginas</option>
+              <option :value="200">200 páginas</option>
             </select>
           </div>
 
           <div class="setting-item checkbox-item">
             <label>
-              <input type="checkbox" v-model="performanceSettings.enableCache" />
+              <input 
+                type="checkbox" 
+                :checked="settingsStore.performance.enableCache"
+                @change="updatePerformanceSetting('enableCache', $event.target.checked)" />
               Habilitar Cache de Biblioteca
             </label>
           </div>
 
           <div class="setting-item checkbox-item">
             <label>
-              <input type="checkbox" v-model="performanceSettings.compressImages" />
+              <input 
+                type="checkbox" 
+                :checked="settingsStore.performance.compressImages"
+                @change="updatePerformanceSetting('compressImages', $event.target.checked)" />
               Comprimir Imagens Automaticamente
             </label>
+          </div>
+
+          <div class="setting-item">
+            <button @click="clearCache" class="action-btn secondary">
+              Limpar Cache ({{ cacheUsed }} MB em uso)
+            </button>
           </div>
         </div>
       </div>
@@ -167,36 +159,42 @@
         <div class="settings-grid">
           <div class="setting-item checkbox-item">
             <label>
-              <input type="checkbox" v-model="backupSettings.autoSaveProgress" />
+              <input 
+                type="checkbox" 
+                :checked="settingsStore.system.autoSaveProgress"
+                @change="updateSystemSetting('autoSaveProgress', $event.target.checked)" />
               Salvar Progresso Automaticamente
             </label>
           </div>
 
           <div class="setting-item">
-            <label>Frequência de Backup:</label>
-            <select v-model="backupSettings.backupFrequency" class="setting-input">
-              <option value="never">Nunca</option>
-              <option value="daily">Diário</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensal</option>
-            </select>
-          </div>
-
-          <div class="setting-item">
-            <label>Local do Backup:</label>
-            <div class="input-group">
-              <input 
-                type="text" 
-                v-model="backupSettings.backupPath" 
-                placeholder="Caminho para backup"
-                class="setting-input"
-              />
-              <button class="browse-btn">Navegar</button>
+            <label>Status do Backup:</label>
+            <div class="backup-status">
+              <span class="status-indicator">Use exportar/importar para backup manual</span>
             </div>
           </div>
         </div>
       </div>
 
+            <!-- Informações do Sistema -->
+      <div class="settings-section">
+        <h2>Informações do Sistema</h2>
+        <div class="system-info">
+          <div class="info-item">
+            <span class="info-label">Versão do Ohara:</span>
+            <span class="info-value">v{{ settingsStore.system.version }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Páginas Pré-carregadas:</span>
+            <span class="info-value">{{ readerStore.preloadedPages.size }} páginas</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Cache em Uso:</span>
+            <span class="info-value">{{ cacheUsed }} MB / {{ settingsStore.performance.cacheSize }} MB</span>
+          </div>
+        </div>
+      </div>
+      
       <!-- Ações -->
       <div class="settings-actions">
         <button @click="exportSettings" class="action-btn secondary">
@@ -212,91 +210,66 @@
           Salvar Configurações
         </button>
       </div>
-
-      <!-- Informações do Sistema -->
-      <div class="settings-section">
-        <h2>Informações do Sistema</h2>
-        <div class="system-info">
-          <div class="info-item">
-            <span class="info-label">Versão do Ohara:</span>
-            <span class="info-value">v1.0.0</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Backend Status:</span>
-            <span class="info-value" :class="{ 'status-online': backendOnline, 'status-offline': !backendOnline }">
-              {{ backendOnline ? 'Online' : 'Offline' }}
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Biblioteca Configurada:</span>
-            <span class="info-value">{{ libraryPath || 'Não configurada' }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Cache Usado:</span>
-            <span class="info-value">{{ cacheUsed }} MB</span>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useLibraryStore } from '@/store/library'
+import { useReaderStore } from '@/store/reader'
+import { useSettingsStore } from '@/store/settings'
 import { useToast } from '@/composables/useToast'
 
 export default {
   name: 'SettingsView',
   setup() {
     const libraryStore = useLibraryStore()
+    const readerStore = useReaderStore()
+    const settingsStore = useSettingsStore()
     const { showSuccess, showError } = useToast()
-
-    const readerSettings = reactive({
-      defaultReadingMode: 'single',
-      defaultFitMode: 'width',
-      defaultDirection: 'rtl',
-      defaultTheme: 'dark',
-      defaultTouchZones: 'edge',
-      defaultAutoScroll: 0
-    })
-
-    const interfaceSettings = reactive({
-      cardSize: 'medium',
-      itemsPerPage: 50,
-      showThumbnails: true,
-      showProgress: true,
-      darkMode: true
-    })
-
-    const performanceSettings = reactive({
-      cacheSize: 100,
-      preloadPages: 5,
-      enableCache: true,
-      compressImages: false
-    })
-
-    const backupSettings = reactive({
-      autoSaveProgress: true,
-      backupFrequency: 'weekly',
-      backupPath: ''
-    })
 
     const backendOnline = ref(false)
     const libraryPath = ref('')
-    const cacheUsed = ref(0)
+
+    // Computed properties
+    const cacheUsed = computed(() => settingsStore.cacheUsed)
+
+    // Methods to update settings
+    const updateReaderSetting = (key, value) => {
+      if (key === 'readingMode') {
+        readerStore.setReadingMode(value)
+      } else {
+        readerStore.updateReadingSettings({ [key]: value })
+      }
+    }
+    
+    const updateInterfaceSetting = (key, value) => {
+      settingsStore.updateInterfaceSettings({ [key]: value })
+    }
+    
+    const updatePerformanceSetting = (key, value) => {
+      settingsStore.updatePerformanceSettings({ [key]: value })
+    }
+
+    const updateSystemSetting = (key, value) => {
+      settingsStore.system[key] = value
+      settingsStore.saveSettings()
+    }
+    
+    const clearCache = () => {
+      settingsStore.clearCache()
+      showSuccess('Cache limpo com sucesso!')
+    }
 
     const loadSettings = () => {
       try {
-        const savedSettings = localStorage.getItem('ohara_system_settings')
-        if (savedSettings) {
-          const settings = JSON.parse(savedSettings)
-          
-          Object.assign(readerSettings, settings.reader || {})
-          Object.assign(interfaceSettings, settings.interface || {})
-          Object.assign(performanceSettings, settings.performance || {})
-          Object.assign(backupSettings, settings.backup || {})
-        }
+        // Load reader settings
+        readerStore.loadSettings()
+        
+        // Load other settings
+        settingsStore.loadSettings()
+        
       } catch (error) {
         console.error('Erro ao carregar configurações:', error)
       }
@@ -304,16 +277,17 @@ export default {
 
     const saveSettings = () => {
       try {
-        const settings = {
-          reader: { ...readerSettings },
-          interface: { ...interfaceSettings },
-          performance: { ...performanceSettings },
-          backup: { ...backupSettings }
+        // Save reader settings
+        readerStore.saveSettings()
+        
+        // Save other settings
+        const success = settingsStore.saveSettings()
+        
+        if (success) {
+          showSuccess('Configurações salvas com sucesso!')
+        } else {
+          showError('Erro ao salvar configurações')
         }
-        
-        localStorage.setItem('ohara_system_settings', JSON.stringify(settings))
-        
-        showSuccess('Configurações salvas com sucesso!')
         
       } catch (error) {
         console.error('Erro ao salvar configurações:', error)
@@ -323,56 +297,26 @@ export default {
 
     const resetToDefaults = () => {
       if (confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão?')) {
-        Object.assign(readerSettings, {
-          defaultReadingMode: 'single',
-          defaultFitMode: 'width',
-          defaultDirection: 'rtl',
-          defaultTheme: 'dark',
-          defaultTouchZones: 'edge',
-          defaultAutoScroll: 0
-        })
-
-        Object.assign(interfaceSettings, {
-          cardSize: 'medium',
-          itemsPerPage: 50,
-          showThumbnails: true,
-          showProgress: true,
-          darkMode: true
-        })
-
-        Object.assign(performanceSettings, {
-          cacheSize: 100,
-          preloadPages: 5,
-          enableCache: true,
-          compressImages: false
-        })
-
-        Object.assign(backupSettings, {
-          autoSaveProgress: true,
-          backupFrequency: 'weekly',
-          backupPath: ''
-        })
-
-        saveSettings()
+        // Reset all settings through stores
+        settingsStore.resetToDefaults()
+        
+        showSuccess('Configurações restauradas para os padrões!')
       }
     }
 
     const exportSettings = () => {
       try {
-        const settings = {
-          reader: { ...readerSettings },
-          interface: { ...interfaceSettings },
-          performance: { ...performanceSettings },
-          backup: { ...backupSettings }
-        }
+        const settings = settingsStore.allSettings
         
         const dataStr = JSON.stringify(settings, null, 2)
         const dataBlob = new Blob([dataStr], { type: 'application/json' })
         
         const link = document.createElement('a')
         link.href = URL.createObjectURL(dataBlob)
-        link.download = 'ohara_settings.json'
+        link.download = `ohara_settings_${new Date().toISOString().split('T')[0]}.json`
         link.click()
+        
+        showSuccess('Configurações exportadas com sucesso!')
         
       } catch (error) {
         console.error('Erro ao exportar configurações:', error)
@@ -392,15 +336,14 @@ export default {
         const reader = new FileReader()
         reader.onload = (e) => {
           try {
-            const settings = JSON.parse(e.target.result)
+            const settingsData = e.target.result
+            const success = settingsStore.importSettings(settingsData)
             
-            if (settings.reader) Object.assign(readerSettings, settings.reader)
-            if (settings.interface) Object.assign(interfaceSettings, settings.interface)
-            if (settings.performance) Object.assign(performanceSettings, settings.performance)
-            if (settings.backup) Object.assign(backupSettings, settings.backup)
-            
-            saveSettings()
-            showSuccess('Configurações importadas com sucesso!')
+            if (success) {
+              showSuccess('Configurações importadas com sucesso!')
+            } else {
+              showError('Erro ao importar configurações: arquivo inválido')
+            }
           } catch (error) {
             console.error('Erro ao importar configurações:', error)
             showError('Erro ao importar configurações: arquivo inválido')
@@ -421,8 +364,6 @@ export default {
       }
 
       libraryPath.value = libraryStore.libraryPath || 'Não configurada'
-
-      cacheUsed.value = Math.round(Math.random() * 50) + 10
     }
 
     onMounted(() => {
@@ -430,18 +371,22 @@ export default {
       checkSystemInfo()
     })
 
+
     return {
-      readerSettings,
-      interfaceSettings,
-      performanceSettings,
-      backupSettings,
+      readerStore,
+      settingsStore,
       backendOnline,
       libraryPath,
       cacheUsed,
+      updateReaderSetting,
+      updateInterfaceSetting,
+      updatePerformanceSetting,
+      updateSystemSetting,
       saveSettings,
       resetToDefaults,
       exportSettings,
-      importSettings
+      importSettings,
+      clearCache
     }
   }
 }
@@ -511,6 +456,10 @@ export default {
   gap: 10px;
 }
 
+.setting-item.full-width {
+  grid-column: 1 / -1;
+}
+
 .setting-item label {
   font-weight: 500;
   color: white;
@@ -555,19 +504,16 @@ export default {
   color: #4ecdc4;
 }
 
-.input-group {
+
+.backup-status {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.browse-btn {
-  padding: 10px 15px;
-  background: linear-gradient(45deg, #4ecdc4, #44a08d);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
-  font-size: 0.9rem;
+.status-indicator.simple {
+  color: #4ecdc4;
+  font-weight: 500;
 }
 
 .settings-actions {
@@ -592,7 +538,8 @@ export default {
 }
 
 .action-btn.primary {
-  background: linear-gradient(45deg, #4ecdc4, #44a08d);
+  background: #3BAF41;
+
   color: white;
 }
 
@@ -603,7 +550,7 @@ export default {
 }
 
 .action-btn.danger {
-  background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+  background:#E53935;
   color: white;
 }
 
@@ -650,5 +597,6 @@ export default {
   .system-info {
     grid-template-columns: 1fr;
   }
+  
 }
 </style>

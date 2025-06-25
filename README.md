@@ -100,3 +100,62 @@ npm install
 npm run dev
 ~~~
 **Frontend disponível em: http://localhost:5173**
+
+---
+
+## Estrutura da Biblioteca
+
+O Ohara espera que sua biblioteca de mangás siga esta estrutura:
+
+```
+biblioteca/
+├── Berserk/
+│   ├── capa.jpg                    # Thumbnail do mangá (opcional)
+│   ├── Capítulo 1/
+│   │   ├── 001.jpg
+│   │   ├── 002.jpg
+│   │   └── 003.jpg
+│   └── Capítulo 2/
+│       ├── 001.jpg
+│       └── 002.jpg
+├── One Piece/
+│   ├── capa.jpg
+│   ├── Cap 1/
+│   │   └── p001.jpg
+│   └── Cap 2/
+│       └── p001.jpg
+└── Hunter x Hunter/
+    ├── Ch 1/
+    │   └── page1.jpg
+    └── Ch 2/
+        └── page1.jpg
+```
+
+### Formatos Suportados
+- **Imagens**: JPG, JPEG, PNG, GIF, WebP
+- **Nomes de pastas**: Qualquer nome é aceito
+- **Detecção automática**: O sistema identifica automaticamente capítulos
+
+## Troubleshooting
+
+### Problemas Comuns
+
+**1. "Pasta não contém subdiretórios"**
+- Verifique se há pastas de mangás dentro da biblioteca
+- Certifique-se de que as pastas contêm subpastas de capítulos
+
+**2. "Caminho não encontrado"**
+- Verifique se o caminho existe e está correto
+- Certifique-se de ter permissões de leitura
+- Evite caminhos com caracteres especiais
+
+**3. "Imagens não carregam"**
+- Verifique se as imagens são dos formatos suportados
+- Certifique-se de que o backend está rodando
+- Limpe o cache se necessário: `POST /api/cache/clear`
+
+**4. "Performance lenta"**
+- Verifique se o cache está habilitado: `GET /api/cache/info`
+- Evite bibliotecas em drives de rede lentos
+- Considere mover arquivos grandes para SSD
+

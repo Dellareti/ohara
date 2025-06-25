@@ -17,12 +17,9 @@ export const useReaderStore = defineStore('reader', {
     error: null,
     
     // Configurações de leitura
-    readingMode: 'single', // single, double, vertical, webtoon
-    fitMode: 'width', // width, height, screen, original
-    readingDirection: 'rtl', // ltr, rtl (right-to-left para mangás japoneses)
-    touchZones: 'edge', // edge, kindle, l-shape, split
+    readingMode: 'vertical', // single, vertical
+    fitMode: 'original', // width, height, screen, original
     theme: 'dark', // dark, light, sepia
-    autoScrollDelay: 0, // segundos (0 = desabilitado)
     
     // Interface
     isFullscreen: false,
@@ -419,10 +416,7 @@ export const useReaderStore = defineStore('reader', {
       const settings = {
         readingMode: this.readingMode,
         fitMode: this.fitMode,
-        readingDirection: this.readingDirection,
-        touchZones: this.touchZones,
-        theme: this.theme,
-        autoScrollDelay: this.autoScrollDelay
+        theme: this.theme
       }
       
       localStorage.setItem('ohara_reader_settings', JSON.stringify(settings))
@@ -443,12 +437,27 @@ export const useReaderStore = defineStore('reader', {
 
     // Reset configurações
     resetSettings() {
-      this.readingMode = 'single'
-      this.fitMode = 'width'
-      this.readingDirection = 'rtl'
-      this.touchZones = 'edge'
+      this.readingMode = 'vertical'
+      this.fitMode = 'original'
       this.theme = 'dark'
-      this.autoScrollDelay = 0
+      this.saveSettings()
+    },
+
+    // Configurar modo de leitura (validar apenas modos suportados)
+    setReadingMode(mode) {
+      if (mode === 'single' || mode === 'vertical') {
+        this.readingMode = mode
+        // Configurar fitMode padrão baseado no modo de leitura
+        if (mode === 'vertical') {
+          this.fitMode = 'original'
+        } else if (mode === 'single') {
+          this.fitMode = 'screen'
+        }
+      } else {
+        // Fallback para vertical se modo inválido
+        this.readingMode = 'vertical'
+        this.fitMode = 'original'
+      }
       this.saveSettings()
     },
 
