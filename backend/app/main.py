@@ -99,10 +99,44 @@ def create_image_url(file_path: str) -> str:
 # Criar aplicação FastAPI
 app = FastAPI(
     title="Ohara - Manga Reader API",
-    description="API para leitor de mangás local",
+    description="""
+    Sistema web para leitura de mangás organizados localmente.
+    
+    ## Funcionalidades
+    - Escaneamento automático de bibliotecas de mangás
+    - Organização automática por mangás e capítulos
+    - Sistema de cache híbrido para performance otimizada
+    - Progresso de leitura persistente
+    - Servir imagens com validação de segurança
+    
+    ## Estrutura da Biblioteca
+    A biblioteca deve seguir a estrutura:
+    ```
+    biblioteca/
+    ├── Manga 1/
+    │   ├── capítulo 1/
+    │   │   ├── página001.jpg
+    │   │   └── página002.jpg
+    │   └── capítulo 2/
+    │       ├── página001.jpg
+    │       └── página002.jpg
+    └── Manga 2/
+        └── capítulo 1/
+            ├── página001.jpg
+            └── página002.jpg
+    ```
+    """,
     version="1.0.0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    contact={
+        "name": "Equipe Ohara",
+        "email": "contato@ohara.dev"
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT"
+    }
 )
 
 # Configurar CORS
@@ -126,8 +160,9 @@ scanner = MangaScanner()
 # Carregar caminho salvo na inicialização
 library_state.load_from_file()
 
-@app.get("/")
+@app.get("/", tags=["health"], summary="Informações da API")
 async def root():
+    """Retorna informações básicas da API Ohara."""
     return {
         "message": "🏴‍☠️ Ohara - Manga Reader API",
         "version": "1.0.0",
@@ -135,8 +170,9 @@ async def root():
         "docs": "/api/docs"
     }
 
-@app.get("/health")
+@app.get("/health", tags=["health"], summary="Verificação de saúde")
 async def health_check():
+    """Endpoint de health check para monitoramento."""
     return {
         "status": "healthy", 
         "service": "ohara-manga-reader",
@@ -300,14 +336,19 @@ def _scan_library_common(library_path: str, method: str = "POST"):
     return response_data
 
 
-@app.post("/api/scan-library")
+@app.post("/api/scan-library", tags=["library"], summary="Escanear biblioteca")
 async def scan_library_path(library_path: str = Form(...)):
     """
+    Escaneia uma pasta do sistema para encontrar mangás organizados.
+    
     Args:
         library_path: Caminho absoluto para a pasta da biblioteca
     
     Returns:
         LibraryResponse: Biblioteca escaneada com mangás encontrados
+        
+    Raises:
+        HTTPException: Se o caminho não existir ou não tiver permissões
     """
     
     try:
@@ -332,11 +373,16 @@ async def scan_library_path(library_path: str = Form(...)):
             }
         )
 
-@app.get("/api/scan-library")
+@app.get("/api/scan-library", tags=["library"], summary="Escanear biblioteca (GET)")
 async def scan_library_get(path: str):
     """
-    Endpoint GET para escanear biblioteca (compatibilidade com frontend)
-    Redireciona para a implementação POST principal
+    Endpoint GET para escanear biblioteca (compatibilidade com frontend).
+    
+    Args:
+        path: Caminho da biblioteca a ser escaneada
+        
+    Returns:
+        Dados da biblioteca escaneada
     """
     try:
         response_data = _scan_library_common(path, "GET")
@@ -356,10 +402,13 @@ async def scan_library_get(path: str):
             }
         )
 
-@app.get("/api/library")
+@app.get("/api/library", tags=["library"], summary="Obter biblioteca atual")
 async def get_library():
     """
-    Retorna a biblioteca atual 
+    Retorna a biblioteca atualmente configurada com todos os mangás.
+    
+    Returns:
+        Dados da biblioteca atual ou biblioteca vazia se não configurada
     """
     
     # Se há uma biblioteca configurada, reescanear
@@ -415,10 +464,19 @@ async def get_library():
         "message": "Configure uma biblioteca para começar",
     })
 
-@app.get("/api/manga/{manga_id}")
+@app.get("/api/manga/{manga_id}", tags=["manga"], summary="Obter detalhes do mangá")
 async def get_manga(manga_id: str):
     """
-    Retorna detalhes completos de um mangá específico
+    Retorna detalhes completos de um mangá específico incluindo capítulos.
+    
+    Args:
+        manga_id: ID único do mangá
+        
+    Returns:
+        Dados completos do mangá com capítulos e metadados
+        
+    Raises:
+        HTTPException: Se o mangá não for encontrado
     """
     
     # Se não há biblioteca configurada, retornar erro
@@ -518,7 +576,7 @@ async def validate_library_path(path: str):
             "readable": False
         }
 
-@app.get("/api/image")
+@app.get("/api/image", tags=["assets"], summary="Servir imagem")
 async def serve_image(path: str):
     try:
         logger.info(f"[IMAGE] Path recebido: {path}")
@@ -568,10 +626,13 @@ async def serve_image(path: str):
         logger.warning(f"Erro inesperado: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@app.get("/api/debug")
+@app.get("/api/debug", tags=["debug"], summary="Informações de debug")
 async def debug_info():
     """
-    Endpoint de debug para verificar estado do backend
+    Endpoint de debug para verificar estado do backend.
+    
+    Returns:
+        Informações de debug sobre o estado atual da aplicação
     """
     
     return {
@@ -595,7 +656,7 @@ if __name__ == "__main__":
 
 # === ENDPOINTS DE CACHE  ===
 
-@app.get("/api/cache/info")
+@app.get("/api/cache/info", tags=["cache"], summary="Informações do cache")
 async def get_cache_info():
     if not library_state.current_path:
         return {
@@ -622,7 +683,7 @@ async def get_cache_info():
             "scanner_version": "Cache Híbrido v1.0"
         }
 
-@app.post("/api/cache/clear")
+@app.post("/api/cache/clear", tags=["cache"], summary="Limpar cache")
 async def clear_cache():
     if not library_state.current_path:
         raise HTTPException(
