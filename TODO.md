@@ -7,14 +7,15 @@
 
 - [x] **URLs hardcoded** no frontend
   - **Arquivos**: `App.vue:44`, `api.js:3`
-  - **Solução**: ✅ Implementado usando variáveis de ambiente (`.env`)
+  - **Solução**: Implementado usando variáveis de ambiente (`.env`)
   - **Status**: Criados arquivos `.env` e `.env.example` com `VITE_API_BASE_URL`
 
 - [x] **Refatorar console.log para sistema de logging adequado**
-  - **Problema**: 54 console.log espalhados pelo frontend (12 arquivos)
-  - **Solução**: ✅ Removidos todos os console.log desnecessários
+  - **Solução**: Removidos todos os console.log desnecessários
   - **Status**: 35 console.log convertidos em comentários 
-  - **Arquivos**: `store/library.js` (20 logs), `store/reader.js` (15 logs)
+
+- [x] **Função create_image_url muito longa** (análise realizada)
+  - **Decisão**: **Não modificar** 
 
 
 ## Problemas de Alta Urgência
@@ -38,8 +39,6 @@
 
 ### Code Quality
 
-- [ ] **Função create_image_url muito longa** (48 linhas em main.py:19-67)
-  - **Solução**: Quebrar em funções menores: `_validate_image_path()`, `_create_api_url()`
 
 
 ## Problemas de Baixa Urgência
