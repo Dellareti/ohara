@@ -81,7 +81,7 @@ export const useReaderStore = defineStore('reader', {
     // Progresso percentual
     progressPercentage: (state) => {
       if (state.totalPages === 0) return 0
-      return Math.round((state.currentPage / Math.max(state.totalPages - 1, 1)) * 100)
+      return Number(((state.currentPage / Math.max(state.totalPages - 1, 1)) * 100).toFixed(2))
     },
     
     // Verificar navegação baseada na lista completa

@@ -6,35 +6,19 @@
       <div class="header-actions">
         <!-- Seletor de ordenação -->
         <select v-model="sortOption" class="sort-select" title="Ordenar por">
-          <option value="alphabetical">📝 A-Z (Padrão)</option>
-          <option value="alphabetical-reverse">📝 Z-A</option>
-          <option value="most-read">👁️ Mais Lidas</option>
-          <option value="least-read">📚 Menos Lidas</option>
-          <option value="chapters-desc">📖 Mais Capítulos</option>
-          <option value="chapters-asc">📖 Menos Capítulos</option>
-          <option value="date-added">🆕 Recém Adicionados</option>
-          <option value="date-modified">🔄 Recém Atualizados</option>
+          <option value="alphabetical">A-Z (Padrão)</option>
+          <option value="alphabetical-reverse">Z-A</option>
+          <option value="most-read">Mais Lidas</option>
+          <option value="least-read">Menos Lidas</option>
+          <option value="chapters-desc">Mais Capítulos</option>
+          <option value="chapters-asc">Menos Capítulos</option>
+          <option value="date-added">Recém Adicionados</option>
+          <option value="date-modified">Recém Atualizados</option>
         </select>
         <router-link to="/setup" class="setup-btn">Setup</router-link>
         <button @click="refreshLibrary" class="refresh-btn">Atualizar</button>
       </div>
     </div>
-    
-    <!-- Stats da biblioteca -->
-    <!-- <div v-if="sortedMangas.length > 0" class="library-stats">
-      <div class="stat-card">
-        <div class="stat-number">{{ sortedMangas.length }}</div>
-        <div class="stat-label">Mangás</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ totalChapters }}</div>
-        <div class="stat-label">Capítulos</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ formatPages(totalPages) }}</div>
-        <div class="stat-label">Páginas</div>
-      </div>
-    </div> -->
 
     <!-- Loading -->
     <div v-if="libraryStore.loading" class="loading-section">

@@ -6,20 +6,21 @@
   - **Status**: Ao implementar utilizando o system file do SO trouxe muitos problemas de navegação e o browser, por medidads de segurança, impede o acesso as pastas. Portanto, preferimos manter a seleção do path como método tradicional para biblioteca.
 
 - [x] **URLs hardcoded** no frontend
-  - **Arquivos**: `App.vue:44`, `api.js:3`
   - **Solução**: Implementado usando variáveis de ambiente (`.env`)
-  - **Status**: Criados arquivos `.env` e `.env.example` com `VITE_API_BASE_URL`
+  - **Status**: **IMPLEMENTADO**
 
 - [x] **Refatorar console.log para sistema de logging adequado**
   - **Solução**: Removidos todos os console.log desnecessários
-  - **Status**: 35 console.log convertidos em comentários 
+  - **Status**: **IMPLEMENTADO**
 
 - [x] **Função create_image_url muito longa** (análise realizada)
   - **Decisão**: **Não modificar** 
 
 - [x] **Tratamento de erro inconsistente** em componentes Vue
   - **Solução**: **IMPLEMENTADO**
-  -
+
+- [x] **Continuar Leitura** 
+  - **Status**: **IMPLEMENTADO**
 
 ## Problemas de Alta Urgência
 
@@ -45,10 +46,6 @@
 - [ ] **Cache híbrido complexo demais** para o caso de uso atual
   - **Avaliação**: Verificar se simplicidade não seria melhor
 
-### Frontend
-
-✅ **Todas as tarefas de frontend foram concluídas**
-
 ## Documentação
 
 - [ ] **Documentação da API** usando OpenAPI/Swagger
@@ -64,9 +61,5 @@
 
 ## Novas Funcinonalidades 
 
-- [ ] **Continuar Leitura** 
-  - **Status**: Parcialmente implementado, precisa melhorar
-
 - [ ] **Configurações gerais** 
   - **Status**: Parcialmente implementado, precisa melhorar
-

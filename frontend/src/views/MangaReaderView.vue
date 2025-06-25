@@ -523,7 +523,16 @@ export default {
     // Lifecycle
     onMounted(() => {
       readerStore.loadSettings()
-      loadChapter()
+      
+      // Verifica se há página inicial na query
+      const targetPage = route.query.page ? parseInt(route.query.page) - 1 : 0
+      
+      loadChapter().then(() => {
+        // Navega para página específica se fornecida
+        if (targetPage > 0 && targetPage < readerStore.totalPages) {
+          readerStore.setCurrentPage(targetPage)
+        }
+      })
       
       document.addEventListener('keydown', handleKeydown)
       document.addEventListener('fullscreenchange', () => {

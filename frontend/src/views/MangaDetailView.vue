@@ -157,7 +157,7 @@
                     :style="{ width: chapter.readProgress + '%' }"
                   ></div>
                 </div>
-                <span class="progress-text">{{ chapter.readProgress }}%</span>
+                <span class="progress-text">{{ chapter.readProgress.toFixed(2) }}%</span>
               </div>
               <div v-if="chapter.isRead" class="read-indicator">✓</div>
             </div>
@@ -193,24 +193,19 @@
     >
       <div class="context-menu-content">
         <button @click="selectChapter" class="menu-option">
-          <span class="menu-icon">☑️</span>
           Selecionar
         </button>
         <button @click="selectAllChapters" class="menu-option">
-          <span class="menu-icon">☑️</span>
           Selecionar Todos
         </button>
         <hr class="menu-divider" />
         <button @click="markAsRead" class="menu-option">
-          <span class="menu-icon">👁️</span>
           {{ contextMenu.chapter?.isRead ? 'Marcar como Não Lido' : 'Marcar como Lido' }}
         </button>
         <button @click="markAsUnread" class="menu-option">
-          <span class="menu-icon">⬜</span>
           Marcar como Não Lido
         </button>
         <button @click="markPreviousAsRead" class="menu-option">
-          <span class="menu-icon">📚</span>
           Marcar Anteriores como Lidos
         </button>
       </div>
@@ -230,13 +225,13 @@
       </div>
       <div class="selection-actions">
         <button @click="markSelectedAsRead" class="action-btn read-btn">
-          ✅ Marcar como Lidos
+          Marcar como Lidos
         </button>
         <button @click="markSelectedAsUnread" class="action-btn unread-btn">
-          ⬜ Marcar como Não Lidos
+          Marcar como Não Lidos
         </button>
         <button @click="clearSelection" class="action-btn cancel-btn">
-          ✖️ Cancelar
+          Cancelar
         </button>
       </div>
     </div>
@@ -296,7 +291,7 @@ export default {
     const readProgress = computed(() => {
       if (!manga.value?.chapters) return 0
       const readChapters = manga.value.chapters.filter(ch => ch.isRead).length
-      return Math.round((readChapters / manga.value.chapters.length) * 100)
+      return Number(((readChapters / manga.value.chapters.length) * 100).toFixed(2))
     })
 
     const filteredChapters = computed(() => {
@@ -373,11 +368,11 @@ export default {
             const chapterProgress = progress.chapters?.[chapter.id]
             if (chapterProgress !== undefined) {
               chapter.isRead = chapterProgress.isRead
-              chapter.readProgress = chapterProgress.progress
+              chapter.readProgress = Number(Number(chapterProgress.progress).toFixed(2))
             } else {
               // Garante que capítulos não salvos sejam não lidos
               chapter.isRead = false
-              chapter.readProgress = 0
+              chapter.readProgress = 0.00
             }
           })
         }
@@ -385,7 +380,71 @@ export default {
     }
 
     const continueReading = () => {
-      showInfo('Funcionalidade ainda em desenvolvimento')
+      if (!manga.value?.chapters || manga.value.chapters.length === 0) {
+        showError('Nenhum capítulo disponível')
+        return
+      }
+
+      const extractNumber = (id) => {
+        const match = id.match(/ch-(\d+(?:\.\d+)?)/)
+        return match ? parseFloat(match[1]) : 0
+      }
+
+      const sortedChapters = [...manga.value.chapters].sort((a, b) => {
+        const numA = extractNumber(a.id)
+        const numB = extractNumber(b.id)
+        return numA - numB
+      })
+
+      const savedProgress = localStorage.getItem(`ohara_progress_${mangaId.value}`)
+      let targetChapter = null
+      let targetPage = 1
+
+      if (savedProgress) {
+        const progress = JSON.parse(savedProgress)
+        
+        for (const chapter of sortedChapters) {
+          const chapterProgress = progress.chapters?.[chapter.id]
+          if (chapterProgress && chapterProgress.progress > 0 && !chapterProgress.isRead) {
+            targetChapter = chapter
+            targetPage = chapterProgress.currentPage || 1
+            break
+          }
+        }
+
+        if (!targetChapter) {
+          for (const chapter of sortedChapters) {
+            const chapterProgress = progress.chapters?.[chapter.id]
+            if (!chapterProgress || !chapterProgress.isRead) {
+              targetChapter = chapter
+              targetPage = 1
+              break
+            }
+          }
+        }
+
+        if (!targetChapter) {
+          targetChapter = sortedChapters[sortedChapters.length - 1]
+          targetPage = 1
+        }
+      } else {
+        targetChapter = sortedChapters[0]
+        targetPage = 1
+      }
+
+      currentChapterId.value = targetChapter.id
+      saveReadingProgress()
+      
+      router.push({
+        name: 'MangaReader',
+        params: {
+          mangaId: mangaId.value,
+          chapterId: targetChapter.id
+        },
+        query: {
+          page: targetPage
+        }
+      })
     }
 
     const openChapter = (chapter) => {
@@ -441,7 +500,7 @@ export default {
       
       manga.value.chapters.forEach(chapter => {
         chapter.isRead = false
-        chapter.readProgress = 0
+        chapter.readProgress = 0.00
       })
       
       saveReadingProgress()
@@ -470,7 +529,7 @@ export default {
         const chapter = manga.value.chapters.find(ch => ch.id === chapterId)
         if (chapter) {
           chapter.isRead = false
-          chapter.readProgress = 0
+          chapter.readProgress = 0.00
         }
       })
       
@@ -514,7 +573,7 @@ export default {
       const chapter = contextMenu.value.chapter
       if (chapter) {
         chapter.isRead = !chapter.isRead
-        chapter.readProgress = chapter.isRead ? 100 : 0
+        chapter.readProgress = chapter.isRead ? 100.00 : 0.00
         saveReadingProgress()
       }
       closeAllMenus()
@@ -524,7 +583,7 @@ export default {
       const chapter = contextMenu.value.chapter
       if (chapter) {
         chapter.isRead = false
-        chapter.readProgress = 0
+        chapter.readProgress = 0.00
         saveReadingProgress()
       }
       closeAllMenus()
@@ -540,7 +599,7 @@ export default {
       // Marcar capítulos anteriores (índices maiores, pois lista está em ordem decrescente)
       for (let i = chapterIndex + 1; i < manga.value.chapters.length; i++) {
         manga.value.chapters[i].isRead = true
-        manga.value.chapters[i].readProgress = 100
+        manga.value.chapters[i].readProgress = 100.00
       }
       
       saveReadingProgress()
