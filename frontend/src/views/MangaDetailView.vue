@@ -6,12 +6,14 @@
       <p>Carregando detalhes do mangá...</p>
     </div>
 
-    <!-- Error State -->
-    <div v-if="error" class="error-state">
-      <h2>❌ Erro ao Carregar Mangá</h2>
-      <p>{{ error }}</p>
-      <button @click="loadManga" class="retry-btn">🔄 Tentar Novamente</button>
-    </div>
+    <ErrorState
+      v-if="error"
+      :message="error"
+      title="Erro ao Carregar Mangá"
+      severity="high"
+      :retryable="true"
+      :on-retry="loadManga"
+    />
 
     <!-- Manga Content - Two Column Layout (35/65) -->
     <div v-if="manga && !loading" class="manga-layout">
@@ -244,14 +246,20 @@
 <script>
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToast } from '@/composables/useToast'
+import ErrorState from '@/components/ErrorState.vue'
 import { useLibraryStore } from '@/store/library'
 
 export default {
   name: 'MangaDetailView',
+  components: {
+    ErrorState
+  },
   setup() {
     const route = useRoute()
     const router = useRouter()
     const libraryStore = useLibraryStore()
+    const { showInfo } = useToast()
 
     // Reactive data
     const manga = ref(null)
@@ -263,6 +271,7 @@ export default {
     const chapterLimit = ref(50)
     const activeMenuChapter = ref(null)
     const selectedChapters = ref([])
+    const showBulkMenu = ref(false)
 
     // Context menu
     const contextMenu = ref({
@@ -376,9 +385,7 @@ export default {
     }
 
     const continueReading = () => {
-      // TODO
-      alert('Ainda a ser implementado')
-
+      showInfo('Funcionalidade ainda em desenvolvimento')
     }
 
     const openChapter = (chapter) => {
@@ -611,6 +618,7 @@ export default {
       activeMenuChapter,
       contextMenu,
       selectedChapters,
+      showBulkMenu,
       statusClass,
       readProgress,
       filteredChapters,

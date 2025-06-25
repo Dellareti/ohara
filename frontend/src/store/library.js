@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { libraryAPI, apiUtils } from '@/services/api'
+import { formatError } from '@/utils/errorUtils'
 
 export const useLibraryStore = defineStore('library', {
   state: () => ({
@@ -193,7 +194,7 @@ export const useLibraryStore = defineStore('library', {
         return data
         
       } catch (error) {
-        this.error = apiUtils.formatError(error)
+        this.error = formatError(error)
         console.error('❌ Erro ao carregar biblioteca:', this.error)
         throw error
       } finally {
@@ -218,7 +219,7 @@ export const useLibraryStore = defineStore('library', {
         return this.currentManga
         
       } catch (error) {
-        this.error = apiUtils.formatError(error)
+        this.error = formatError(error)
         console.error('❌ Erro ao carregar mangá:', this.error)
         throw error
       } finally {
@@ -455,7 +456,7 @@ export const useLibraryStore = defineStore('library', {
         console.error('❌ Erro na validação:', error)
         return {
           valid: false,
-          message: apiUtils.formatError(error)
+          message: formatError(error)
         }
       }
     },
@@ -481,7 +482,7 @@ export const useLibraryStore = defineStore('library', {
           valid: false,
           mangas: [],
           totalFound: 0,
-          message: apiUtils.formatError(error)
+          message: formatError(error)
         }
       }
     }

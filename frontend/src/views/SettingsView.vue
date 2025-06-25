@@ -244,13 +244,14 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { useLibraryStore } from '@/store/library'
+import { useToast } from '@/composables/useToast'
 
 export default {
   name: 'SettingsView',
   setup() {
     const libraryStore = useLibraryStore()
+    const { showSuccess, showError } = useToast()
 
-    // Estados reativos para as configurações
     const readerSettings = reactive({
       defaultReadingMode: 'single',
       defaultFitMode: 'width',
@@ -281,12 +282,10 @@ export default {
       backupPath: ''
     })
 
-    // Estados de informação
     const backendOnline = ref(false)
     const libraryPath = ref('')
     const cacheUsed = ref(0)
 
-    // Métodos
     const loadSettings = () => {
       try {
         const savedSettings = localStorage.getItem('ohara_system_settings')
@@ -314,18 +313,16 @@ export default {
         
         localStorage.setItem('ohara_system_settings', JSON.stringify(settings))
         
-        // Mostrar feedback
-        alert('Configurações salvas com sucesso!')
+        showSuccess('Configurações salvas com sucesso!')
         
       } catch (error) {
         console.error('Erro ao salvar configurações:', error)
-        alert('❌ Erro ao salvar configurações')
+        showError('Erro ao salvar configurações')
       }
     }
 
     const resetToDefaults = () => {
       if (confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão?')) {
-        // Resetar para valores padrão
         Object.assign(readerSettings, {
           defaultReadingMode: 'single',
           defaultFitMode: 'width',
@@ -379,7 +376,7 @@ export default {
         
       } catch (error) {
         console.error('Erro ao exportar configurações:', error)
-        alert('❌ Erro ao exportar configurações')
+        showError('Erro ao exportar configurações')
       }
     }
 
@@ -403,10 +400,10 @@ export default {
             if (settings.backup) Object.assign(backupSettings, settings.backup)
             
             saveSettings()
-            alert('Configurações importadas com sucesso!')
+            showSuccess('Configurações importadas com sucesso!')
           } catch (error) {
             console.error('Erro ao importar configurações:', error)
-            alert('❌ Erro ao importar configurações: arquivo inválido')
+            showError('Erro ao importar configurações: arquivo inválido')
           }
         }
         reader.readAsText(file)
@@ -416,7 +413,6 @@ export default {
     }
 
     const checkSystemInfo = async () => {
-      // Verificar status do backend
       try {
         const response = await fetch('http://localhost:8000/api/test')
         backendOnline.value = response.ok
@@ -424,14 +420,11 @@ export default {
         backendOnline.value = false
       }
 
-      // Informações da biblioteca
       libraryPath.value = libraryStore.libraryPath || 'Não configurada'
 
-      // Calcular cache usado (simulado)
       cacheUsed.value = Math.round(Math.random() * 50) + 10
     }
 
-    // Lifecycle
     onMounted(() => {
       loadSettings()
       checkSystemInfo()

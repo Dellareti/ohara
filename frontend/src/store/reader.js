@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { formatError } from '@/utils/errorUtils'
 
 const API_BASE_URL = 'http://localhost:8000'
 
@@ -42,7 +43,10 @@ export const useReaderStore = defineStore('reader', {
     // Cache e Performance
     preloadedPages: new Set(),
     pageCache: new Map(),
-    maxCacheSize: 50
+    maxCacheSize: 50,
+    
+    // Internal
+    _saveProgressTimeout: null
   }),
 
   getters: {
@@ -136,7 +140,7 @@ export const useReaderStore = defineStore('reader', {
         return data
         
       } catch (error) {
-        this.error = this.formatError(error)
+        this.error = formatError(error)
         console.error('❌ Erro ao carregar capítulo:', error)
         throw error
       } finally {
@@ -478,31 +482,16 @@ export const useReaderStore = defineStore('reader', {
       this.pageCache.clear()
     },
 
-    // Formatação de erros
-    formatError(error) {
-      if (error.response) {
-        return error.response.data?.detail || error.response.data?.message || `Erro ${error.response.status}`
-      } else if (error.request) {
-        return 'Erro de conexão com o servidor'
+    saveProgressDebounced() {
+      if (this._saveProgressTimeout) {
+        clearTimeout(this._saveProgressTimeout)
       }
-      return error.message || 'Erro desconhecido'
+      
+      this._saveProgressTimeout = setTimeout(() => {
+        if (this.currentManga && this.currentChapter) {
+          this.saveProgress(this.currentManga.id, this.currentChapter.chapter.id)
+        }
+      }, 1000)
     }
   }
 })
-
-// Debounce para salvar progresso
-let saveProgressTimeout = null
-
-// Adicionar método ao store
-const readerStoreActions = useReaderStore.prototype || {}
-readerStoreActions.saveProgressDebounced = function() {
-  if (saveProgressTimeout) {
-    clearTimeout(saveProgressTimeout)
-  }
-  
-  saveProgressTimeout = setTimeout(() => {
-    if (this.currentManga && this.currentChapter) {
-      this.saveProgress(this.currentManga.id, this.currentChapter.chapter.id)
-    }
-  }, 1000) // Salvar após 1 segundo de inatividade
-}

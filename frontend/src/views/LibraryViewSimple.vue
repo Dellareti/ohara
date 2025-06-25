@@ -42,11 +42,15 @@
       <p>Carregando biblioteca...</p>
     </div>
 
-    <!-- Error -->
-    <div v-if="libraryStore.error" class="error-section">
-      <p>❌ {{ libraryStore.error }}</p>
-      <button @click="loadLibrary" class="retry-btn">🔄 Tentar novamente</button>
-    </div>
+    <ErrorState
+      v-if="libraryStore.error"
+      :message="libraryStore.error"
+      title="Erro ao Carregar Biblioteca"
+      severity="high"
+      :retryable="true"
+      :on-retry="loadLibrary"
+      compact
+    />
 
     <!-- Biblioteca vazia -->
     <div v-if="!libraryStore.loading && !libraryStore.error && libraryStore.mangas.length === 0" class="empty-library">
@@ -99,10 +103,14 @@
 <script>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import ErrorState from '@/components/ErrorState.vue'
 import { useLibraryStore } from '@/store/library'
 
 export default {
   name: 'LibraryViewSimple',
+  components: {
+    ErrorState
+  },
   setup() {
     const router = useRouter()
     const libraryStore = useLibraryStore()
@@ -303,7 +311,7 @@ export default {
     // Lifecycle
     onMounted(async () => {
       loadSortPreference()
-      libraryStore.loadSavedConfiguration()
+      libraryStore.loadLibraryConfig()
       
       if (libraryStore.libraryPath) {
         await refreshLibrary()

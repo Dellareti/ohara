@@ -28,16 +28,34 @@
     <footer class="app-footer">
       <p>Ohara Manga Reader - Leia suas histórias favoritas</p>
     </footer>
+
+    <div class="toast-container">
+      <transition-group name="toast" tag="div">
+        <div
+          v-for="toast in toasts"
+          :key="toast.id"
+          :class="['toast', `toast-${toast.type}`]"
+          @click="removeToast(toast.id)"
+        >
+          <div class="toast-content">
+            <span class="toast-message">{{ toast.message }}</span>
+          </div>
+          <button class="toast-close" @click.stop="removeToast(toast.id)">×</button>
+        </div>
+      </transition-group>
+    </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
+import { useToast } from './composables/useToast.js'
 
 export default {
   name: 'App',
   setup() {
     const isConnected = ref(false)
+    const { toasts, removeToast } = useToast()
     
     const checkConnection = async () => {
       try {
@@ -61,7 +79,9 @@ export default {
     })
     
     return { 
-      isConnected
+      isConnected,
+      toasts,
+      removeToast
     }
   }
 }
@@ -237,7 +257,102 @@ body:has(.manga-reader) .app-main {
   opacity: 0.8;
 }
 
-/* Responsive */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 4px solid;
+}
+
+.toast:hover {
+  transform: translateX(-5px);
+}
+
+.toast-error {
+  background: rgba(239, 68, 68, 0.9);
+  border-left-color: #dc2626;
+  color: white;
+}
+
+.toast-success {
+  background: rgba(34, 197, 94, 0.9);
+  border-left-color: #16a34a;
+  color: white;
+}
+
+.toast-warning {
+  background: rgba(245, 158, 11, 0.9);
+  border-left-color: #d97706;
+  color: white;
+}
+
+.toast-info {
+  background: rgba(59, 130, 246, 0.9);
+  border-left-color: #2563eb;
+  color: white;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.toast-message {
+  font-size: 14px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
 @media (max-width: 768px) {
   .main-nav {
     flex-direction: column;
@@ -256,6 +371,18 @@ body:has(.manga-reader) .app-main {
   .connection-status {
     order: -1;
     margin-bottom: 0.5rem;
+  }
+  
+  .toast-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+  
+  .toast {
+    margin: 0 auto;
+    max-width: 100%;
   }
 }
 </style>

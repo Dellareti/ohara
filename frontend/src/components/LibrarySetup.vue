@@ -120,12 +120,14 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/store/library'
+import { useToast } from '@/composables/useToast'
 
 export default {
   name: 'LibrarySetup',
   setup() {
     const router = useRouter()
     const libraryStore = useLibraryStore()
+    const { showError } = useToast()
     
     // Estado reativo
     const libraryPath = ref('')
@@ -233,7 +235,7 @@ export default {
         
       } catch (error) {
         console.error('❌ Erro ao configurar biblioteca:', error)
-        alert('❌ Erro ao configurar biblioteca: ' + error.message)
+        showError('Erro ao configurar biblioteca: ' + error.message)
       } finally {
         isConfiguring.value = false
       }
