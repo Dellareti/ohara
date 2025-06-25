@@ -14,6 +14,7 @@
           <router-link to="/" class="nav-link">Biblioteca</router-link>
           <router-link to="/setup" class="nav-link">Setup</router-link>
           <router-link to="/settings" class="nav-link">Configurações</router-link>
+          <router-link to="/manual" class="nav-link">Manual</router-link>
         </div>
       </nav>
     </header>

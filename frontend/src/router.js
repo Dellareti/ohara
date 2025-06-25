@@ -5,6 +5,7 @@ const LibraryViewSimple = () => import('@/views/LibraryViewSimple.vue')
 const MangaDetailView = () => import('@/views/MangaDetailView.vue')
 const MangaReaderView = () => import('@/views/MangaReaderView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
+const ManualView = () => import('@/views/ManualView.vue')
 
 // Importar componentes
 const LibrarySetup = () => import('@/components/LibrarySetup.vue')
@@ -37,6 +38,14 @@ const routes = [
     component: SettingsView,
     meta: {
       title: 'Configurações - Ohara'
+    }
+  },
+  {
+    path: '/manual',
+    name: 'Manual',
+    component: ManualView,
+    meta: {
+      title: 'Manual de Uso - Ohara'
     }
   },
   {
