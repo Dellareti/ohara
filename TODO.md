@@ -37,6 +37,10 @@
   - [x] **Configurações gerais** 
   - **Status**: **IMPLEMENTADO**
 
+  - [x] **Mover a pasta testes** 
+  - **Status**: **IMPLEMENTADO**
+
+
 ## Problemas de Alta Urgência
 
 - [ ] **Arquivo main.py muito grande** com 1034 linhas e múltiplas responsabilidades
@@ -61,6 +65,4 @@
 - [ ] **Cache híbrido complexo demais** para o caso de uso atual
   - **Avaliação**: Verificar se simplicidade não seria melhor
 
-## Documentação
 
-- [ ] **Mover a pasta testes** para a pasta raiz e tira-lá da pasta app, pois o padrão python é testes na pasta raiz

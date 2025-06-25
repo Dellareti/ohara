@@ -35,7 +35,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        pytest -v --cov=app --cov-report=html app/tests/
+        pytest -v --cov=app --cov-report=html tests/
       env:
         PYTHONPATH: ${{ github.workspace }}/backend
 
