@@ -19,7 +19,7 @@
           </div>
           <div class="info-card">
             <h3>3. Organização</h3>
-            <p>Organize sua biblioteca usando filtros, ordenação e diferentes visualizações de cards.</p>
+            <p>Para o bom funcionamento do sitema, tende deixar as pastas na estrutura indicada em setup. Não é preciso ter os mesmos nomes, apenas a estrutura.</p>
           </div>
         </div>
       </section>

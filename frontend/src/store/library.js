@@ -462,31 +462,5 @@ export const useLibraryStore = defineStore('library', {
         }
       }
     },
-
-    // Preview dos mangás que seriam encontrados
-    async previewLibrary(path) {
-      try {
-        // Fazendo preview da biblioteca
-        
-        const response = await fetch(`${API_BASE_URL}/api/preview-library?path=${encodeURIComponent(path)}`)
-        const data = await response.json()
-        
-        return {
-          valid: data.valid,
-          mangas: data.mangas || [],
-          totalFound: data.total_found || 0,
-          message: data.message
-        }
-        
-      } catch (error) {
-        console.error('Erro no preview:', error)
-        return {
-          valid: false,
-          mangas: [],
-          totalFound: 0,
-          message: formatError(error)
-        }
-      }
-    }
   }
 })

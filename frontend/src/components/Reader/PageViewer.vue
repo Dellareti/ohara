@@ -65,12 +65,6 @@
       </div>
     </transition>
 
-    <!-- Zoom controls (para modo original) -->
-    <div v-if="fitMode === 'original' && readingMode === 'single'" class="zoom-controls">
-      <button @click="zoomIn" class="zoom-btn">🔍+</button>
-      <button @click="zoomOut" class="zoom-btn">🔍-</button>
-      <button @click="resetZoom" class="zoom-btn">⚏</button>
-    </div>
   </div>
 </template>
 
@@ -95,8 +89,7 @@ export default {
     'next-page',
     'previous-page',
     'toggle-controls',
-    'page-changed',
-    'zoom-changed'
+    'page-changed'
   ],
 
   setup(props, { emit }) {
@@ -105,8 +98,6 @@ export default {
     const verticalContainer = ref(null)
     const imageLoading = ref(false)
     const pageTransition = ref(null)
-    const zoomLevel = ref(1)
-    const panOffset = ref({ x: 0, y: 0 })
     
     // Touch handling
     const touchStart = ref({ x: 0, y: 0, time: 0 })
@@ -133,8 +124,7 @@ export default {
           style.objectFit = 'contain'
           break
         case 'original':
-          style.transform = `scale(${zoomLevel.value}) translate(${panOffset.value.x}px, ${panOffset.value.y}px)`
-          style.transformOrigin = 'center center'
+          // Tamanho original sem zoom
           break
       }
       
@@ -169,13 +159,7 @@ export default {
     }
 
     const handleWheel = (event) => {
-      if (props.fitMode === 'original') {
-        // Zoom com scroll wheel
-        event.preventDefault()
-        const delta = event.deltaY > 0 ? -0.1 : 0.1
-        zoomLevel.value = Math.max(0.5, Math.min(3, zoomLevel.value + delta))
-        emit('zoom-changed', zoomLevel.value)
-      }
+      // Wheel handling removido (zoom não implementado)
     }
 
     const handleTouchStart = (event) => {
@@ -214,22 +198,6 @@ export default {
       }
     }
 
-    // Zoom controls
-    const zoomIn = () => {
-      zoomLevel.value = Math.min(3, zoomLevel.value + 0.25)
-      emit('zoom-changed', zoomLevel.value)
-    }
-
-    const zoomOut = () => {
-      zoomLevel.value = Math.max(0.5, zoomLevel.value - 0.25)
-      emit('zoom-changed', zoomLevel.value)
-    }
-
-    const resetZoom = () => {
-      zoomLevel.value = 1
-      panOffset.value = { x: 0, y: 0 }
-      emit('zoom-changed', zoomLevel.value)
-    }
 
     const onImageLoad = () => {
       imageLoading.value = false
@@ -308,17 +276,12 @@ export default {
       verticalContainer,
       imageLoading,
       pageTransition,
-      zoomLevel,
-      panOffset,
       pageImageStyle,
       verticalPageStyle,
       handleClick,
       handleWheel,
       handleTouchStart,
       handleTouchEnd,
-      zoomIn,
-      zoomOut,
-      resetZoom,
       onImageLoad,
       onImageError
     }
@@ -375,8 +338,6 @@ export default {
   display: block;
   transition: transform 0.2s ease;
 }
-
-
 
 /* Vertical mode */
 .vertical-container {
@@ -453,36 +414,6 @@ export default {
   opacity: 0;
 }
 
-/* Zoom controls */
-.zoom-controls {
-  position: absolute;
-  bottom: 2rem;
-  right: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  z-index: 50;
-}
-
-.zoom-btn {
-  width: 48px;
-  height: 48px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.zoom-btn:hover {
-  background: rgba(0, 0, 0, 0.9);
-  transform: scale(1.1);
-}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -493,17 +424,6 @@ export default {
   .double-page-container {
     flex-direction: column;
     gap: 0.5rem;
-  }
-  
-  .zoom-controls {
-    bottom: 1rem;
-    right: 1rem;
-  }
-  
-  .zoom-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 0.9rem;
   }
 }
 </style>

@@ -53,7 +53,3 @@
 ### Desenvolvimento
 
   - **Prioridade**: Testes para MangaScanner, endpoints críticos
-
-
-
-

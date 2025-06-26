@@ -5,157 +5,189 @@
 - Raquel Gonçalves Rosa
 
 ## Descrição do Sistema
-Sistema web para leitura de mangás organizados localmente. O Ohara escaneia estruturas de pastas contendo mangás, organiza automaticamente por capítulos e oferece uma interface intuitiva para leitura. O sistema permite configurar uma biblioteca local, visualizar thumbnails, navegar entre capítulos e acompanhar o progresso de leitura.
+Sistema web para leitura de mangás organizados localmente. O Ohara escaneia estruturas de pastas contendo mangás, organiza automaticamente por capítulos e oferece uma interface intuitiva para leitura com acompanhamento de progresso.
 
 **Funcionalidades principais:**
 - Escaneamento automático de bibliotecas de mangás
 - Organização automática por mangás e capítulos
-- Interface de leitura com navegação por páginas
-- Sistema de cache para melhor performance
-- API REST para integração
+- Interface de leitura responsiva com navegação por páginas
+- Sistema de cache híbrido para alta performance
+- Acompanhamento de progresso de leitura
+- Servir de imagens com validação de segurança
 
 ## Tecnologias Utilizadas
 
 **Frontend:**
-- Vue.js 3 - Framework JavaScript reativo
-- Vue Router - Roteamento de páginas
+- Vue.js 3 (Composition API)
+- Vue Router 4 - Roteamento
 - Pinia - Gerenciamento de estado
-- Vite - Build tool e servidor de desenvolvimento
-- Axios - Cliente HTTP para comunicação com API
+- Vite - Build tool e dev server
+- Axios - Cliente HTTP
 
 **Backend:**
-- FastAPI - Framework web moderno para Python
-- Uvicorn - Servidor ASGI de alta performance
-- Pydantic - Validação de dados e serialização
-- Python 3.10+ - Linguagem de programação
+- FastAPI - Framework web Python
+- Uvicorn - Servidor ASGI
+- Pydantic - Validação de dados
+- Python 3.10+
 
-**Outras tecnologias:**
-- JSON - Armazenamento de dados e cache
-- REST API - Arquitetura de comunicação
-- CORS - Configuração de cross-origin
+**Armazenamento:**
+- JSON - Dados e cache local
+- LocalStorage - Configurações do usuário
 
-## Como Executar o Projeto
-**Pré-requisitos**
+## Como Executar
 
-Python 3.10+ instalado
+### Pré-requisitos
+- Python 3.10+
+- Node.js 18+ e npm
+- Git
 
-Node.js 18+ e npm instalados
-
-Git para clonar o repositório
-
-## Clonar o Repositório
-~~~sh
+### 1. Clonar Repositório
+```sh
 git clone git@github.com:Dellareti/ohara.git
-~~~
-
-~~~sh
 cd ohara
-~~~
+```
 
-## Configurar o Backend
-
-### Criar Ambiente Virtual
-~~~sh
+### 2. Backend
+```sh
 cd backend
-~~~
-
-~~~sh
 python -m venv venv
-~~~
-
-~~~sh
-source venv/bin/activate
-~~~
-
-### Instalar Dependências
-~~~sh
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-~~~
-
-### Executar o Backend
-
-~~~sh
 python -m app.main
-~~~
+```
+**Backend:** http://localhost:8000  
+**API Docs:** http://localhost:8000/api/docs
 
-**Backend disponível em: http://localhost:8000**
-
-**Documentação da API: http://localhost:8000/api/docs**
-
-## Configurar o Frontend
-
-### Abrir novo terminal e navegar para frontend
-~~~sh
+### 3. Frontend
+```sh
 cd frontend
-~~~
-
-Instalar Dependências
-
-~~~sh
 npm install
-~~~
-
-### Executar o Frontend
-~~~sh
 npm run dev
-~~~
-**Frontend disponível em: http://localhost:5173**
+```
+**Frontend:** http://localhost:5173
 
----
+## 📂 Estrutura da Biblioteca
 
-## Estrutura da Biblioteca
-
-O Ohara espera que sua biblioteca de mangás siga esta estrutura:
+O Ohara funciona esperando esse tipo de organização, e recomenda-se:
 
 ```
 biblioteca/
 ├── Berserk/
-│   ├── capa.jpg                    # Thumbnail do mangá (opcional)
+│   ├── capa.jpg                    # Thumbnail (opcional)
 │   ├── Capítulo 1/
 │   │   ├── 001.jpg
 │   │   ├── 002.jpg
 │   │   └── 003.jpg
 │   └── Capítulo 2/
-│       ├── 001.jpg
-│       └── 002.jpg
+│       └── ...
 ├── One Piece/
-│   ├── capa.jpg
 │   ├── Cap 1/
-│   │   └── p001.jpg
 │   └── Cap 2/
-│       └── p001.jpg
 └── Hunter x Hunter/
     ├── Ch 1/
-    │   └── page1.jpg
     └── Ch 2/
-        └── page1.jpg
 ```
 
-### Formatos Suportados
-- **Imagens**: JPG, JPEG, PNG, GIF, WebP
-- **Nomes de pastas**: Qualquer nome é aceito
-- **Detecção automática**: O sistema identifica automaticamente capítulos
+**Formatos suportados:**
+- Imagens: JPG, JPEG, PNG, GIF, WebP, BMP
+- Qualquer nome de pasta é aceito
+- Detecção automática de capítulos
+
+## Arquitetura
+
+### Backend (FastAPI)
+- **MangaScanner**: Escaneia e indexa bibliotecas
+- **SimpleCache**: Cache inteligente baseado em timestamps
+- **LibraryState**: Estado global da biblioteca
+- **API REST**: Endpoints seguros para comunicação
+- **Image Server**: Servir imagens com validação
+
+### Frontend (Vue.js)
+- **Stores (Pinia)**: Library, Reader, Settings
+- **Components**: Library, Reader, Settings, Manual
+- **Services**: API client com interceptadores
+- **Router**: Navegação com guards
+
+## Principais Endpoints
+
+### Biblioteca
+- `POST /api/scan-library` - Escanear biblioteca
+- `GET /api/library` - Obter biblioteca atual
+- `GET /api/validate-path` - Validar caminho
+
+### Mangás e Capítulos
+- `GET /api/manga/{manga_id}` - Detalhes do mangá
+- `GET /api/manga/{manga_id}/chapter/{chapter_id}` - Páginas do capítulo
+
+### Progresso
+- `POST /api/progress/{manga_id}/{chapter_id}` - Salvar progresso
+- `GET /api/progress/{manga_id}` - Obter progresso
+
+### Utilitários
+- `GET /api/image?path=` - Servir imagens
+- `GET /api/cache/info` - Status do cache
+- `GET /health` - Health check
+
+## Performance
+
+### Cache Híbrido
+- **Detecta mudanças**: Apenas reprocessa arquivos modificados
+- **90% mais rápido**: Em re-escaneamentos
+- **Inteligente**: Baseado em timestamps de modificação
+
+
+## Testes
+
+```bash
+# Backend - Todos os testes
+cd backend
+pytest
+```
+
+# Com cobertura
+```bash
+pytest --cov=app --cov-report=html
+```
+
+# Testes específicos
+```bash
+pytest tests/unit/api/
+pytest tests/unit/models/test_manga.py
+
+```
 
 ## Troubleshooting
 
 ### Problemas Comuns
 
-**1. "Pasta não contém subdiretórios"**
-- Verifique se há pastas de mangás dentro da biblioteca
-- Certifique-se de que as pastas contêm subpastas de capítulos
+**❌ "Pasta não contém subdiretórios"**
+- Verifique se há pastas de mangás na biblioteca
+- Certifique-se de que mangás têm subpastas de capítulos
 
-**2. "Caminho não encontrado"**
-- Verifique se o caminho existe e está correto
-- Certifique-se de ter permissões de leitura
-- Evite caminhos com caracteres especiais
+**❌ "Caminho não encontrado"**
+- Confirme se o caminho existe e está correto
+- Verifique permissões de leitura
+- Evite caracteres especiais no caminho
 
-**3. "Imagens não carregam"**
-- Verifique se as imagens são dos formatos suportados
-- Certifique-se de que o backend está rodando
-- Limpe o cache se necessário: `POST /api/cache/clear`
+**❌ "Imagens não carregam"**
+- Confirme formatos suportados (JPG, PNG, GIF, WebP)
+- Verifique se backend está rodando na porta 8000
+- Limpe cache: acesse http://localhost:8000/api/cache/clear
 
-**4. "Performance lenta"**
-- Verifique se o cache está habilitado: `GET /api/cache/info`
-- Evite bibliotecas em drives de rede lentos
-- Considere mover arquivos grandes para SSD
+**❌ "Performance lenta"**
+- Verifique cache: http://localhost:8000/api/cache/info
+- Evite bibliotecas em drives de rede
+- Considere usar SSD para bibliotecas grandes
 
+### Debug e Logs
+```bash
+# Status do sistema
+curl http://localhost:8000/health
+curl http://localhost:8000/api/cache/info
+curl http://localhost:8000/api/debug
+
+# Logs detalhados
+cd backend
+python -m app.main  # Logs aparecem no terminal
+```

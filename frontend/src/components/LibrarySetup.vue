@@ -116,7 +116,6 @@ export default {
     // Estado reativo
     const libraryPath = ref('')
     const validation = ref({ checked: false, valid: false, message: '' })
-    const foundMangas = ref([])
     const previousLibrary = ref('')
     const isConfiguring = ref(false)
     
@@ -131,7 +130,6 @@ export default {
     const validatePath = async () => {
       if (!libraryPath.value.trim()) {
         validation.value = { checked: false, valid: false, message: '' }
-        foundMangas.value = []
         return
       }
       
@@ -145,12 +143,6 @@ export default {
           message: data.message || (data.is_valid ? 'Caminho válido!' : 'Caminho inválido')
         }
         
-        // Se válido, buscar mangás
-        if (data.is_valid) {
-          await previewMangas()
-        } else {
-          foundMangas.value = []
-        }
         
       } catch (error) {
         console.error('Erro na validação:', error)
@@ -159,30 +151,8 @@ export default {
           valid: false,
           message: 'Erro ao validar caminho'
         }
-        foundMangas.value = []
       }
     }
-    
-    const previewMangas = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/preview-library?path=${encodeURIComponent(libraryPath.value)}`)
-        const data = await response.json()
-        
-        if (data.total_manga_folders > 0) {
-          // Generate placeholder manga names since API doesn't return specific titles
-          const mangaCount = data.total_manga_folders
-          foundMangas.value = Array.from({ length: Math.min(mangaCount, 20) }, (_, i) => 
-            `Mangá ${i + 1}`
-          )
-        } else {
-          foundMangas.value = []
-        }
-      } catch (error) {
-        console.error('Erro ao buscar preview:', error)
-        foundMangas.value = []
-      }
-    }
-    
     
     const configureLibrary = async () => {
       if (!validation.value.valid) return
@@ -252,7 +222,6 @@ export default {
     return {
       libraryPath,
       validation,
-      foundMangas,
       previousLibrary,
       isConfiguring,
       validatePathDebounced,
@@ -358,40 +327,6 @@ export default {
   background: rgba(244, 67, 54, 0.2);
   border: 1px solid #f44336;
   color: #f44336;
-}
-
-.preview-section {
-  margin: 30px 0;
-  padding: 20px;
-  background: rgba(76, 175, 80, 0.1);
-  border-radius: 10px;
-  border: 1px solid rgba(76, 175, 80, 0.3);
-}
-
-.preview-section h3 {
-  color: #4caf50;
-  margin-bottom: 15px;
-}
-
-.manga-preview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.manga-item {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 10px;
-  border-radius: 5px;
-  font-size: 0.9rem;
-}
-
-.more-mangas {
-  grid-column: 1 / -1;
-  text-align: center;
-  opacity: 0.7;
-  font-style: italic;
-  margin-top: 10px;
 }
 
 .previous-section {
