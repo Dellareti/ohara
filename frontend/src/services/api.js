@@ -15,7 +15,7 @@ api.interceptors.request.use(
     return config
   },
   (error) => {
-    console.error('❌ API Request Error:', error)
+    console.error('API Request Error:', error)
     return Promise.reject(error)
   }
 )
@@ -25,7 +25,7 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    console.error('❌ API Response Error:', error.response?.status, error.message)
+    console.error('API Response Error:', error.response?.status, error.message)
     return Promise.reject(error)
   }
 )
@@ -48,7 +48,7 @@ export const libraryAPI = {
       
       return response
     } catch (error) {
-      console.error('❌ Erro ao escanear biblioteca:', error)
+      console.error('Erro ao escanear biblioteca:', error)
       throw error
     }
   },

@@ -29,11 +29,6 @@ __pycache__/
 htmlcov/
 coverage.xml
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
 # Temporary files
 *.tmp
 *.temp

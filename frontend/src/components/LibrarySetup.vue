@@ -36,23 +36,6 @@
           </div>
         </div>
 
-        <!-- Preview dos Mangás Encontrados -->
-        <div v-if="validation.valid && foundMangas.length > 0" class="preview-section">
-          <h3>Mangás Encontrados ({{ foundMangas.length }})</h3>
-          <div class="manga-preview">
-            <div 
-              v-for="manga in foundMangas.slice(0, 6)" 
-              :key="manga"
-              class="manga-item"
-            >
-              📚 {{ manga }}
-            </div>
-            <div v-if="foundMangas.length > 6" class="more-mangas">
-              ... e mais {{ foundMangas.length - 6 }} mangás
-            </div>
-          </div>
-        </div>
-
         <!-- Biblioteca Anterior (se existir) -->
         <div v-if="previousLibrary" class="previous-section">
           <h3>Biblioteca Anterior</h3>
@@ -125,6 +108,7 @@ import { useToast } from '@/composables/useToast'
 export default {
   name: 'LibrarySetup',
   setup() {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
     const router = useRouter()
     const libraryStore = useLibraryStore()
     const { showError } = useToast()
@@ -152,17 +136,17 @@ export default {
       }
       
       try {
-        const response = await fetch(`http://localhost:8000/api/validate-path?path=${encodeURIComponent(libraryPath.value)}`)
+        const response = await fetch(`${API_BASE_URL}/api/validate-path?path=${encodeURIComponent(libraryPath.value)}`)
         const data = await response.json()
         
         validation.value = {
           checked: true,
-          valid: data.valid,
-          message: data.message || (data.valid ? 'Caminho válido!' : 'Caminho inválido')
+          valid: data.is_valid,
+          message: data.message || (data.is_valid ? 'Caminho válido!' : 'Caminho inválido')
         }
         
         // Se válido, buscar mangás
-        if (data.valid) {
+        if (data.is_valid) {
           await previewMangas()
         } else {
           foundMangas.value = []
@@ -181,11 +165,17 @@ export default {
     
     const previewMangas = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/preview-library?path=${encodeURIComponent(libraryPath.value)}`)
+        const response = await fetch(`${API_BASE_URL}/api/preview-library?path=${encodeURIComponent(libraryPath.value)}`)
         const data = await response.json()
         
-        if (data.mangas) {
-          foundMangas.value = data.mangas.map(m => m.title || m.name || 'Mangá sem nome')
+        if (data.total_manga_folders > 0) {
+          // Generate placeholder manga names since API doesn't return specific titles
+          const mangaCount = data.total_manga_folders
+          foundMangas.value = Array.from({ length: Math.min(mangaCount, 20) }, (_, i) => 
+            `Mangá ${i + 1}`
+          )
+        } else {
+          foundMangas.value = []
         }
       } catch (error) {
         console.error('Erro ao buscar preview:', error)
@@ -208,7 +198,7 @@ export default {
         const formData = new FormData()
         formData.append('library_path', libraryPath.value)
         
-        const response = await fetch('http://localhost:8000/api/scan-library', {
+        const response = await fetch(`${API_BASE_URL}/api/scan-library`, {
           method: 'POST',
           body: formData
         })
@@ -234,7 +224,7 @@ export default {
         }
         
       } catch (error) {
-        console.error('❌ Erro ao configurar biblioteca:', error)
+        console.error('Erro ao configurar biblioteca:', error)
         showError('Erro ao configurar biblioteca: ' + error.message)
       } finally {
         isConfiguring.value = false

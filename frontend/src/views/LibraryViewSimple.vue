@@ -41,7 +41,7 @@
       <div class="empty-icon">📚</div>
       <h2>Biblioteca Vazia</h2>
       <p>Configure sua biblioteca para começar a leitura</p>
-      <router-link to="/setup" class="setup-link">⚙️ Configurar Agora</router-link>
+      <router-link to="/setup" class="setup-link">Configurar Agora</router-link>
     </div>
 
     <!-- Grid de Mangás (usando paginatedMangas) -->
@@ -278,7 +278,7 @@ export default {
       try {
         await libraryStore.fetchLibrary()
       } catch (error) {
-        console.error('❌ Erro ao carregar biblioteca:', error)
+        console.error('Erro ao carregar biblioteca:', error)
       }
     }
 
@@ -287,7 +287,7 @@ export default {
         try {
           await libraryStore.scanLibrary()
         } catch (error) {
-          console.error('❌ Erro ao atualizar biblioteca:', error)
+          console.error('Erro ao atualizar biblioteca:', error)
         }
       } else {
         await loadLibrary()
@@ -306,7 +306,7 @@ export default {
       if (!thumbnailPath) return null
       
       if (thumbnailPath.startsWith('/')) {
-        return `http://localhost:8000/api/image?path=${encodeURIComponent(thumbnailPath)}`
+        return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/image?path=${encodeURIComponent(thumbnailPath)}`
       }
       
       return thumbnailPath
@@ -372,10 +372,13 @@ export default {
       settingsStore.loadSettings()
       libraryStore.loadLibraryConfig()
       
-      if (libraryStore.libraryPath) {
-        await refreshLibrary()
-      } else {
-        await loadLibrary()
+      // Usar cache se disponível, só recarregar se necessário
+      if (!libraryStore.isInitialized || libraryStore.mangas.length === 0) {
+        if (libraryStore.libraryPath) {
+          await refreshLibrary()
+        } else {
+          await loadLibrary()
+        }
       }
     })
 

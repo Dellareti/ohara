@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.library_state import library_state
 from app.core.services.manga_scanner import MangaScanner
 
 logger = logging.getLogger(__name__)
@@ -100,13 +101,12 @@ def _find_chapter_flexible(manga, chapter_id: str):
     
     return None
 
-@router.get("/manga/{manga_id}/chapter/{chapter_id}")
+@router.get("/api/manga/{manga_id}/chapter/{chapter_id}")
 async def get_chapter(manga_id: str, chapter_id: str):
     """
     Retorna dados completos de um capítulo específico
     Aceita múltiplos formatos de chapter_id
     """
-    from app.core.library_state import library_state
     
     if not library_state.current_path:
         raise HTTPException(
@@ -191,12 +191,11 @@ async def get_chapter(manga_id: str, chapter_id: str):
             detail=f"Erro ao carregar capítulo: {str(e)}"
         )
 
-@router.get("/manga/{manga_id}/chapters")
-async def get_manga_chapters(manga_id: str, limit: int = Query(50, ge=1, le=200)):
+@router.get("/api/manga/{manga_id}/chapters")
+async def get_manga_chapters(manga_id: str, limit: int = Query(500, ge=1, le=1000)):
     """
     Retorna lista de capítulos de um mangá (para navegação)
     """
-    from app.core.library_state import library_state
     
     if not library_state.current_path:
         raise HTTPException(
@@ -252,7 +251,7 @@ async def get_manga_chapters(manga_id: str, limit: int = Query(50, ge=1, le=200)
             detail=f"Erro ao listar capítulos: {str(e)}"
         )
 
-@router.post("/progress/{manga_id}/{chapter_id}")
+@router.post("/api/progress/{manga_id}/{chapter_id}")
 async def save_reading_progress(
     manga_id: str, 
     chapter_id: str,
@@ -314,7 +313,7 @@ async def save_reading_progress(
             detail=f"Erro ao salvar progresso: {str(e)}"
         )
 
-@router.get("/progress/{manga_id}")
+@router.get("/api/progress/{manga_id}")
 async def get_manga_progress(manga_id: str):
     """
     Retorna progresso de leitura de um mangá
@@ -350,7 +349,7 @@ async def get_manga_progress(manga_id: str):
             detail=f"Erro ao carregar progresso: {str(e)}"
         )
 
-@router.get("/progress/{manga_id}/{chapter_id}")
+@router.get("/api/progress/{manga_id}/{chapter_id}")
 async def get_chapter_progress(manga_id: str, chapter_id: str):
     """
     Retorna progresso específico de um capítulo
@@ -389,25 +388,33 @@ async def get_chapter_progress(manga_id: str, chapter_id: str):
 def _find_previous_chapter(manga, current_chapter):
     chapters = manga.chapters
     for i, chapter in enumerate(chapters):
-        if chapter.id == current_chapter.id and i < len(chapters) - 1:
-            prev_ch = chapters[i + 1]  # Lista está em ordem decrescente
-            return {
-                "id": prev_ch.id,
-                "name": prev_ch.name,
-                "number": prev_ch.number
-            }
+        if chapter.id == current_chapter.id:
+            # Verificar se há capítulo anterior na lista (índice maior, pois lista está em ordem decrescente)
+            if i < len(chapters) - 1:
+                prev_ch = chapters[i + 1]
+                return {
+                    "id": prev_ch.id,
+                    "name": prev_ch.name,
+                    "number": prev_ch.number
+                }
+            # Se chegou aqui, é o último da lista (primeiro cronologicamente)
+            return None
     return None
 
 def _find_next_chapter(manga, current_chapter):
     chapters = manga.chapters
     for i, chapter in enumerate(chapters):
-        if chapter.id == current_chapter.id and i > 0:
-            next_ch = chapters[i - 1]  # Lista está em ordem decrescente
-            return {
-                "id": next_ch.id,
-                "name": next_ch.name,
-                "number": next_ch.number
-            }
+        if chapter.id == current_chapter.id:
+            # Verificar se há próximo capítulo na lista (índice menor, pois lista está em ordem decrescente)
+            if i > 0:
+                next_ch = chapters[i - 1]
+                return {
+                    "id": next_ch.id,
+                    "name": next_ch.name,
+                    "number": next_ch.number
+                }
+            # Se chegou aqui, é o primeiro da lista (último cronologicamente)
+            return None
     return None
 
 def _get_chapter_index(manga, current_chapter):

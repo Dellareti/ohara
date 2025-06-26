@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import axios from 'axios'
 import { formatError } from '@/utils/errorUtils'
 
-const API_BASE_URL = 'http://localhost:8000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export const useReaderStore = defineStore('reader', {
   state: () => ({
@@ -119,33 +119,55 @@ export const useReaderStore = defineStore('reader', {
         this.currentChapter = data
         this.totalPages = data.chapter.pages.length
         
-        // 3. Carregar lista completa de capítulos para navegação
-        await this.loadChapterNavigation(mangaId, chapterId)
+        // 3. Usar navegação do backend
+        if (data.navigation) {
+          this.navigation = {
+            previousChapter: data.navigation.previous_chapter,
+            nextChapter: data.navigation.next_chapter,
+            chapterIndex: data.navigation.chapter_index,
+            allChapters: [] // Será carregado separadamente se necessário
+          }
+        }
         
-        // 4. Carregar progresso salvo
+        // 4. Carregar lista completa de capítulos para funcionalidades extras
+        this.loadChapterList(mangaId)
+        
+        // 5. Carregar progresso salvo
         await this.loadChapterProgress(mangaId, chapterId)
         
-        // 5. Iniciar timer de leitura
+        // 6. Iniciar timer de leitura
         this.readingStartTime = Date.now()
         
-        // 6. Pré-carregar páginas
+        // 7. Pré-carregar páginas
         this.preloadPages()
         
-        // Capítulo carregado
-        // Navegação final
         
         return data
         
       } catch (error) {
         this.error = formatError(error)
-        console.error('❌ Erro ao carregar capítulo:', error)
+        console.error('Erro ao carregar capítulo:', error)
         throw error
       } finally {
         this.loading = false
       }
     },
 
-    // Método para carregar navegação entre capítulos
+    // Método para carregar lista de capítulos
+    async loadChapterList(mangaId) {
+      try {
+        const chaptersResponse = await axios.get(`${API_BASE_URL}/api/manga/${mangaId}/chapters`)
+        const chaptersData = chaptersResponse.data
+        
+        if (chaptersData.chapters && Array.isArray(chaptersData.chapters)) {
+          this.navigation.allChapters = chaptersData.chapters
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar lista de capítulos:', error)
+      }
+    },
+
+    // Método para carregar navegação entre capítulos (DEPRECADO - usar navegação do backend)
     async loadChapterNavigation(mangaId, currentChapterId) {
       try {
         // Carregando navegação
@@ -202,7 +224,7 @@ export const useReaderStore = defineStore('reader', {
         this.setupNavigation(allChapters, currentIndex)
         
       } catch (error) {
-        console.error('❌ Erro ao carregar navegação:', error)
+        console.error('Erro ao carregar navegação:', error)
         this.navigation = {
           previousChapter: null,
           nextChapter: null,
@@ -252,7 +274,7 @@ export const useReaderStore = defineStore('reader', {
         }
       }
       
-      console.warn('❌ Nenhuma estratégia encontrou o capítulo');
+      console.warn('Nenhuma estratégia encontrou o capítulo');
       return -1;
     },
 

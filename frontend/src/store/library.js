@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { libraryAPI, apiUtils } from '@/services/api'
 import { formatError } from '@/utils/errorUtils'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
 export const useLibraryStore = defineStore('library', {
   state: () => ({
     // Dados da biblioteca
@@ -74,7 +76,7 @@ export const useLibraryStore = defineStore('library', {
         return this.backendOnline
       } catch (error) {
         this.backendOnline = false
-        console.error('❌ Erro ao verificar backend:', error)
+        console.error('Erro ao verificar backend:', error)
         return false
       }
     },
@@ -82,7 +84,7 @@ export const useLibraryStore = defineStore('library', {
     // Limpar biblioteca no backend
     async clearBackendLibrary() {
       try {
-        const response = await fetch('http://localhost:8000/api/clear-library', {
+        const response = await fetch(`${API_BASE_URL}/api/clear-library`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         })
@@ -108,11 +110,10 @@ export const useLibraryStore = defineStore('library', {
       this.error = null
       
       try {
-        // Usar POST com FormData como o backend espera
         const formData = new FormData()
         formData.append('library_path', this.libraryPath)
         
-        const response = await fetch('http://localhost:8000/api/scan-library', {
+        const response = await fetch(`${API_BASE_URL}/api/scan-library`, {
           method: 'POST',
           body: formData
         })
@@ -131,7 +132,6 @@ export const useLibraryStore = defineStore('library', {
           this.lastUpdated = new Date(data.library.last_updated || Date.now())
           this.lastLoadTime = Date.now()
           
-          // Salvar configuração no localStorage
           this.saveLibraryConfig()
           
           return true
@@ -140,7 +140,7 @@ export const useLibraryStore = defineStore('library', {
         }
         
       } catch (error) {
-        console.error('❌ Erro no scan:', error)
+        console.error('Erro no scan:', error)
         this.error = error.message
         throw error
       } finally {
@@ -153,11 +153,10 @@ export const useLibraryStore = defineStore('library', {
     async fetchLibrary(forceRefresh = false) {
       // Se já foi inicializado e cache é válido, não recarregar
       if (this.isInitialized && !forceRefresh && this.isCacheValid && this.mangas.length > 0) {
-        // Cache válido, usando dados em memória
         return { mangas: this.mangas }
       }
       
-      if (this.scanning) return // Evitar chamadas simultâneas
+      if (this.scanning) return
       
       this.loading = true
       this.error = null
@@ -195,7 +194,7 @@ export const useLibraryStore = defineStore('library', {
         
       } catch (error) {
         this.error = formatError(error)
-        console.error('❌ Erro ao carregar biblioteca:', this.error)
+        console.error('Erro ao carregar biblioteca:', this.error)
         throw error
       } finally {
         this.loading = false
@@ -220,7 +219,7 @@ export const useLibraryStore = defineStore('library', {
         
       } catch (error) {
         this.error = formatError(error)
-        console.error('❌ Erro ao carregar mangá:', this.error)
+        console.error('Erro ao carregar mangá:', this.error)
         throw error
       } finally {
         this.loading = false
@@ -281,22 +280,21 @@ export const useLibraryStore = defineStore('library', {
 
     // Configurar caminho da biblioteca
     async setLibraryPath(path) {
-      // Configurando caminho da biblioteca
       
       try {
         // Validar caminho primeiro
         const validation = await this.validatePath(path)
-        if (!validation.valid) {
+        if (!validation.valid && !validation.is_valid) {
           throw new Error(validation.message)
         }
         
         // Configurar no backend
-        const response = await fetch('http://localhost:8000/api/set-library-path', {
+        const formData = new FormData()
+        formData.append('library_path', path)
+        
+        const response = await fetch(`${API_BASE_URL}/api/set-library-path`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ path })
+          body: formData
         })
         
         if (!response.ok) {
@@ -305,21 +303,20 @@ export const useLibraryStore = defineStore('library', {
         
         const data = await response.json()
         
-        if (data.success) {
+        if (data.status === 'configured') {
           this.libraryPath = path
           this.isInitialized = true
           
           // Salvar no localStorage
           this.saveLibraryConfig()
           
-          // Biblioteca configurada
           return true
         } else {
-          throw new Error(data.message)
+          throw new Error(data.message || 'Erro ao configurar biblioteca')
         }
         
       } catch (error) {
-        console.error('❌ Erro ao configurar biblioteca:', error)
+        console.error('Erro ao configurar biblioteca:', error)
         throw error
       }
     },
@@ -331,7 +328,6 @@ export const useLibraryStore = defineStore('library', {
           localStorage.setItem('ohara_library_path', this.libraryPath)
           localStorage.setItem('ohara_last_load', this.lastLoadTime?.toString() || '')
           localStorage.setItem('ohara_last_updated', this.lastUpdated?.toISOString() || '')
-          // Configuração salva no localStorage
         }
       } catch (error) {
         console.warn('Erro ao salvar no localStorage:', error)
@@ -398,7 +394,7 @@ export const useLibraryStore = defineStore('library', {
       await this.checkBackendStatus()
       
       if (!this.backendOnline) {
-        this.error = 'Backend não está acessível. Verifique se está rodando em http://localhost:8000'
+        this.error = `Backend não está acessível. Verifique se está rodando em ${API_BASE_URL}`
         return
       }
       
@@ -429,7 +425,7 @@ export const useLibraryStore = defineStore('library', {
         
         this.isInitialized = true
       } catch (error) {
-        console.error('❌ Erro na inicialização:', error)
+        console.error('Erro na inicialização:', error)
         this.error = 'Erro ao inicializar biblioteca'
       }
     },
@@ -437,8 +433,6 @@ export const useLibraryStore = defineStore('library', {
     // Validar caminho de biblioteca
     async validatePath(path) {
       try {
-        // Validando caminho
-        
         // Validação local primeiro
         const localValidation = apiUtils.validatePathFormat(path)
         if (!localValidation.valid) {
@@ -450,10 +444,18 @@ export const useLibraryStore = defineStore('library', {
         
         // Validação no servidor
         const response = await libraryAPI.validatePath(path)
-        return response.data
+        const data = response.data
+        
+        // Garantir compatibilidade de campos
+        return {
+          valid: data.is_valid,
+          is_valid: data.is_valid,
+          message: data.message,
+          path: data.path
+        }
         
       } catch (error) {
-        console.error('❌ Erro na validação:', error)
+        console.error('Erro na validação:', error)
         return {
           valid: false,
           message: formatError(error)
@@ -466,7 +468,7 @@ export const useLibraryStore = defineStore('library', {
       try {
         // Fazendo preview da biblioteca
         
-        const response = await fetch(`http://localhost:8000/api/preview-library?path=${encodeURIComponent(path)}`)
+        const response = await fetch(`${API_BASE_URL}/api/preview-library?path=${encodeURIComponent(path)}`)
         const data = await response.json()
         
         return {
@@ -477,7 +479,7 @@ export const useLibraryStore = defineStore('library', {
         }
         
       } catch (error) {
-        console.error('❌ Erro no preview:', error)
+        console.error('Erro no preview:', error)
         return {
           valid: false,
           mangas: [],

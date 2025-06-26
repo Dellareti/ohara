@@ -40,19 +40,12 @@
   - [x] **Mover a pasta testes** 
   - **Status**: **IMPLEMENTADO**
 
+- [x] **Arquivo main.py muito grande** 
+  - **Status**: **IMPLEMENTADO**
 
 ## Problemas de Alta Urgência
 
-- [ ] **Arquivo main.py muito grande** com 1034 linhas e múltiplas responsabilidades
-  - **Impacto**: Dificulta navegação e manutenção
-  - **Solução**: Dividir em módulos:
-    - `endpoints/library.py` - Endpoints de biblioteca
-    - `endpoints/manga.py` - Endpoints de mangá  
-    - `endpoints/cache.py` - Endpoints de cache
-    - `endpoints/debug.py` - Endpoints de debug
-
 - [ ] **Classe MangaScanner complexa demais** (789 linhas, múltiplas responsabilidades)
-  - **Impacto**: Hard to test, maintain and extend
   - **Solução**: Separar em:
     - `MangaScanner` - Lógica principal
     - `CacheManager` - Gerenciamento de cache

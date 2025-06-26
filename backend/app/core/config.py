@@ -36,9 +36,6 @@ class Settings(BaseSettings):
     cache_thumbnails: bool = True
     cache_dir: str = "cache"
     
-    # Configurações de banco de dados 
-    database_url: str = "sqlite:///./ohara.db"
-    
     # Configurações de logging
     log_level: str = "INFO"
     log_file: str = "ohara.log"
