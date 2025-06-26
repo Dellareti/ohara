@@ -1,659 +1,313 @@
-import os
-import re
 import logging
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional
 
 from app.core.config import get_settings, SUPPORTED_IMAGE_EXTENSIONS
-from app.core.services.cache_manager import CacheManager
+from app.core.services.simple_cache import SimpleCache
 from app.core.services.chapter_parser import ChapterParser
 from app.models.manga import Manga, Chapter, Page, Library
 
 logger = logging.getLogger(__name__)
 
+
 class MangaScanner:
     """
-    Scanner principal de mangás com arquitetura modular.
+    Scanner simplificado e eficiente de mangás.
     
-    Esta classe orquestra o escaneamento de bibliotecas de mangás,
-    delegando responsabilidades específicas para classes especializadas:
-    - CacheManager: Gerenciamento de cache híbrido
-    - ChapterParser: Análise e ordenação de capítulos
-    
-    Funcionalidades principais:
-    - Escaneamento paralelo de mangás para performance otimizada
-    - Descoberta automática de estruturas de mangá
-    - Lazy loading de páginas para economizar memória
-    - Fallback robusto em caso de erros
-    
-    Estrutura esperada da biblioteca:
-    ```
-    biblioteca/
-    ├── Manga1/
-    │   ├── capa.jpg (opcional)
-    │   ├── Capítulo 1/
-    │   │   ├── 001.jpg
-    │   │   └── 002.jpg
-    │   └── Capítulo 2/
-    │       └── 001.jpg
-    └── Manga2/
-        └── Ch 1/
-            └── page1.jpg
-    ```
-    
-    Attributes:
-        cache_enabled (bool): Controla se o cache híbrido está ativo
-        max_workers (int): Número máximo de threads para processamento paralelo
+    Funcionalidades essenciais:
+    - Escaneamento de bibliotecas de mangás
+    - Cache simples baseado em timestamp
+    - Descoberta de estruturas de mangá
     """
     
     def __init__(self):
         self.settings = get_settings()
         self.supported_extensions = SUPPORTED_IMAGE_EXTENSIONS
-        
-        # Configurações principais
         self.cache_enabled = True
-        self.max_workers = 4
         
-        # Componentes especializados
-        self.cache_manager = CacheManager()
+        # Componentes essenciais
+        self.cache = SimpleCache()
         self.chapter_parser = ChapterParser()
-
-        logger.info(f"MangaScanner inicializado (Cache Híbrido v{self.cache_manager.cache_version})")
+        
+        logger.info("MangaScanner inicializado (modo simplificado)")
 
     def scan_library(self, library_path: str) -> Library:
-        """
-        Escaneia uma biblioteca de mangás com sistema de cache híbrido.
+        """Escaneia uma biblioteca de mangás com cache simples"""
+        library_path_obj = Path(library_path)
         
-        Este é o método principal da classe, que orquestra todo o processo
-        de escaneamento. Primeiro tenta usar o cache híbrido otimizado,
-        e em caso de falha, utiliza o scanner de fallback.
+        if not library_path_obj.exists():
+            raise ValueError(f"Biblioteca não encontrada: {library_path}")
         
-        Args:
-            library_path (str): Caminho absoluto para a pasta da biblioteca
-            
-        Returns:
-            Library: Objeto Library populado com todos os mangás encontrados
-            
-        Raises:
-            ValueError: Se o caminho for inválido ou inacessível
-        """
-        try:
-            return self._scan_library_with_cache(library_path)
-        except Exception as e:
-            logger.warning(f"Cache híbrido falhou, usando scanner fallback: {e}")
-            return self._scan_library_fallback(library_path)
-    
-    def _scan_library_with_cache(self, library_path: str) -> Library:
-        """
-        Scanner principal com cache híbrido otimizado.
+        # Carregar cache se habilitado
+        cache_data = {}
+        if self.cache_enabled:
+            cache_file = library_path_obj / self.cache.cache_file_name
+            cache_data = self.cache.load_cache(cache_file)
         
-        Este método implementa a lógica principal do cache híbrido:
-        1. Carrega cache existente (se houver)
-        2. Descobre diretórios de mangá na biblioteca
-        3. Classifica mangás entre cache hits e que precisam scan
-        4. Escaneia apenas os mangás necessários em paralelo
-        5. Combina resultados cached + novos
-        6. Atualiza o cache com novos dados
-        7. Retorna biblioteca completa
-        
-        O cache é baseado em timestamps de modificação das pastas,
-        garantindo que apenas conteúdo modificado seja reprocessado.
-        
-        Args:
-            library_path (str): Caminho da biblioteca a ser escaneada
-            
-        Returns:
-            Library: Biblioteca completa com cache aplicado
-            
-        Performance:
-            - Bibliotecas pequenas (1-10 mangás): ~0.5-2s
-            - Bibliotecas médias (50-100 mangás): ~3-8s (primeiro scan)
-            - Re-escaneamentos com cache: ~0.1-1s (90% mais rápido)
-        """
-        start_time = time.time()
-        library_path = Path(library_path)
-        
-        if not self.cache_enabled:
-            logger.info("Cache desabilitado, usando scan direto")
-            return self._scan_library_fallback(str(library_path))
-
-        logger.info(f"Iniciando scan híbrido: {library_path}")
-
-        # 1. Setup do cache
-        cache_file = library_path / self.cache_manager.cache_file_name
-        cache_data = self.cache_manager.load_cache(cache_file)
-        
-        # 2. Descobrir mangás na pasta
-        manga_dirs = self._get_manga_directories_fast(library_path)
+        # Descobrir diretórios de mangá
+        manga_dirs = self._discover_manga_directories(library_path_obj)
         logger.info(f"Encontrados {len(manga_dirs)} diretórios de mangá")
         
-        # 3. Dividir entre cache e scan
-        cached_mangas, dirs_to_scan = self._classify_mangas(manga_dirs, cache_data)
-
-        logger.info(f"Cache hits: {len(cached_mangas)}, Rescans: {len(dirs_to_scan)}")
-        
-        # 4. Escanear apenas os necessários
-        new_mangas = []
-        if dirs_to_scan:
-            logger.info(f"Escaneando {len(dirs_to_scan)} mangás...")
-            new_mangas = self._scan_mangas_parallel_safe(dirs_to_scan)
-        
-        # 5. Combinar resultados
-        all_mangas = cached_mangas + new_mangas
-        
-        # 6. Atualizar cache
-        if new_mangas:
-            self.cache_manager.save_cache(cache_file, all_mangas)
-        
-        # 7. Criar biblioteca final
-        library = Library()
-        for manga in all_mangas:
-            library.add_manga(manga)
-        
-        elapsed = time.time() - start_time
-        logger.info(f"Scan híbrido concluído em {elapsed:.2f}s ({len(all_mangas)} mangás)")
-        
-        return library
-
-    @staticmethod
-    def _get_manga_directories_fast(library_path: Path) -> List[Path]:
-        """Obter diretórios usando os.scandir() (mais rápido que iterdir)"""
-        manga_dirs = []
-
-        try:
-            with os.scandir(library_path) as entries:
-                for entry in entries:
-                    if entry.is_dir() and not entry.name.startswith('.'):
-                        manga_dirs.append(Path(entry.path))
-        except OSError as e:
-            logger.warning(f"Erro ao listar diretórios: {e}")
-            manga_dirs = [d for d in library_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
-
-        return sorted(manga_dirs, key=lambda x: x.name.lower())
-
-    def _classify_mangas(self, manga_dirs: List[Path], cache_data: Dict) -> Tuple[List[Manga], List[Path]]:
-        """
-        Classifica mangás entre aqueles que podem usar cache e os que precisam scan.
-        
-        Este é o coração do sistema de cache híbrido. Para cada mangá,
-        verifica se existe entrada válida no cache comparando timestamps
-        de modificação. Se o diretório não foi modificado desde o último
-        cache, reutiliza os dados. Caso contrário, marca para re-scan.
-        
-        Args:
-            manga_dirs (List[Path]): Lista de diretórios de mangá encontrados
-            cache_data (Dict): Dados do cache carregados do arquivo
-            
-        Returns:
-            Tuple[List[Manga], List[Path]]: 
-                - Lista de mangás restaurados do cache
-                - Lista de diretórios que precisam ser re-escaneados
-                
-        Cache Strategy:
-            - Compara timestamp de modificação da pasta (st_mtime)
-            - Tolera diferença de até 1 segundo para sistemas de arquivos
-            - Invalida cache se versão for diferente
-            - Fallback seguro em caso de erro na restauração
-        """
-        cached_mangas = []
-        dirs_to_scan = []
+        # Processar mangás
+        mangas = []
+        cache_hits = 0
         
         for manga_dir in manga_dirs:
             manga_id = self._generate_manga_id(manga_dir.name)
             cache_entry = cache_data.get(manga_id)
             
-            if self.cache_manager.can_use_cache(manga_dir, cache_entry):
-                try:
-                    manga = self.cache_manager.restore_manga_from_cache(cache_entry['manga_data'])
-                    if manga:
-                        # Recriar páginas sob demanda para cada capítulo
-                        for chapter in manga.chapters:
-                            if not chapter.pages:
-                                chapter_path = Path(chapter.path)
-                                if chapter_path.exists():
-                                    chapter.pages = self._create_pages_lazy(chapter_path)
-                                    if len(chapter.pages) != chapter.page_count:
-                                        chapter.page_count = len(chapter.pages)
-                        
-                        # Buscar thumbnail se não existir
-                        if not manga.thumbnail:
-                            manga_path = Path(manga.path)
-                            if manga_path.exists():
-                                manga.thumbnail = self._find_thumbnail(manga_path)
-                        
-                        cached_mangas.append(manga)
-                        continue
-                except Exception as e:
-                    logger.warning(f"Erro ao restaurar {manga_dir.name} do cache: {e}")
+            # Tentar usar cache
+            if self.cache_enabled and self.cache.is_valid(manga_dir, cache_entry):
+                manga = self.cache.restore_manga(cache_entry['manga_data'])
+                if manga:
+                    # Recriar páginas se necessário
+                    self._ensure_pages_loaded(manga)
+                    mangas.append(manga)
+                    cache_hits += 1
+                    continue
             
-            # Precisa escanear
-            dirs_to_scan.append(manga_dir)
+            # Escanear mangá
+            manga = self.scan_manga(str(manga_dir))
+            if manga:
+                mangas.append(manga)
         
-        return cached_mangas, dirs_to_scan
+        # Salvar cache atualizado
+        if self.cache_enabled and mangas:
+            self.cache.save_cache(library_path_obj / self.cache.cache_file_name, mangas)
+        
+        logger.info(f"Biblioteca escaneada: {len(mangas)} mangás ({cache_hits} do cache)")
+        
+        library = Library(mangas=mangas)
+        library._update_stats()
+        return library
     
-    
-    def _scan_mangas_parallel_safe(self, manga_dirs: List[Path]) -> List[Manga]:
-        """
-        Escaneia múltiplos mangás em paralelo com sistema de fallback robusto.
+    def scan_manga(self, manga_path: str) -> Optional[Manga]:
+        """Escaneia um mangá específico"""
+        manga_path_obj = Path(manga_path)
         
-        Utiliza ThreadPoolExecutor para processar múltiplos mangás simultaneamente,
-        com tratamento granular de erros. Se o processamento paralelo falhar
-        para algum mangá, tenta o scanner fallback. Se falhar completamente,
-        usa processamento sequencial.
-        
-        Args:
-            manga_dirs (List[Path]): Diretórios de mangá para processar
-            
-        Returns:
-            List[Manga]: Lista de mangás processados com sucesso
-            
-        Fallback Strategy:
-            1. Tenta scan paralelo otimizado
-            2. Se falhar, tenta scan tradicional para cada mangá
-            3. Se paralelo falhar completamente, usa processamento sequencial
-            4. Nunca falha silenciosamente - sempre loga erros
-            
-        Performance:
-            - Usa até 4 threads por padrão (configurável via max_workers)
-            - Timeout de 30s por mangá para evitar travamentos
-            - Processa mangás únicos sequencialmente (otimização)
-        """
-        if len(manga_dirs) == 1:
-            manga = self.scan_manga(str(manga_dirs[0]))
-            return [manga] if manga else []
-        
-        mangas = []
-        
-        try:
-            with ThreadPoolExecutor(max_workers=min(self.max_workers, len(manga_dirs))) as executor:
-                future_to_dir = {
-                    executor.submit(self._scan_manga_optimized_safe, manga_dir): manga_dir 
-                    for manga_dir in manga_dirs
-                }
-                
-                for future in as_completed(future_to_dir):
-                    manga_dir = future_to_dir[future]
-                    try:
-                        manga = future.result(timeout=30)
-                        if manga and manga.chapters:
-                            mangas.append(manga)
-                    except Exception as e:
-                        logger.warning(f"Erro paralelo em {manga_dir.name}: {e}")
-                        try:
-                            manga = self.scan_manga(str(manga_dir))
-                            if manga and manga.chapters:
-                                mangas.append(manga)
-                        except Exception as e2:
-                            logger.warning(f"Fallback também falhou para {manga_dir.name}: {e2}")
-        
-        except Exception as e:
-            logger.info(f"Paralelização falhou, usando scan sequencial: {e}")
-            for manga_dir in manga_dirs:
-                try:
-                    manga = self.scan_manga(str(manga_dir))
-                    if manga and manga.chapters:
-                        mangas.append(manga)
-                except Exception as e:
-                    logger.warning(f"Erro em {manga_dir.name}: {e}")
-        
-        return mangas
-    
-    def _scan_manga_optimized_safe(self, manga_path: Path) -> Optional[Manga]:
-        """Scanner de mangá individual otimizado com fallbacks"""
-        try:
-            # Usar scanner otimizado
-            return self._scan_manga_fast(manga_path)
-        except Exception as e:
-            logger.warning(f"Scanner otimizado falhou para {manga_path.name}: {e}")
-            return self.scan_manga(str(manga_path))
-    
-    def _scan_manga_fast(self, manga_path: Path) -> Optional[Manga]:
-        """
-        Scanner otimizado de mangá individual com lazy loading de páginas.
-        
-        Este método implementa várias otimizações para acelerar o scan:
-        - Usa os.scandir() em vez de iterdir() para melhor performance I/O
-        - Implementa lazy loading: páginas são criadas sem carregar metadados
-        - Conta arquivos de imagem sem abrir/validar cada um
-        - Gera thumbnails sob demanda
-        
-        Args:
-            manga_path (Path): Caminho do diretório do mangá
-            
-        Returns:
-            Optional[Manga]: Objeto Manga populado ou None se inválido
-            
-        Optimizations:
-            - os.scandir(): ~3x mais rápido que iterdir() para diretórios grandes
-            - Lazy loading: economiza ~70% de memória em bibliotecas grandes
-            - Count-first: evita criar objetos Page desnecessários
-            - Thumbnail caching: reutiliza thumbnails entre escans
-        """
-        # Criar objeto mangá
-        manga_id = self._generate_manga_id(manga_path.name)
-        manga = Manga(
-            id=manga_id,
-            title=manga_path.name,
-            path=str(manga_path),
-            date_added=datetime.fromtimestamp(manga_path.stat().st_ctime)
-        )
-        
-        # Buscar thumbnail
-        manga.thumbnail = self._find_thumbnail(manga_path)
-        
-        # Escanear capítulos
-        chapters = self._scan_chapters_optimized(manga_path, manga_id)
-        
-        if not chapters:
+        if not manga_path_obj.exists():
             return None
         
-        # Ordenar e estatísticas
-        manga.chapters = self.chapter_parser.sort_chapters(chapters)
-        manga.chapter_count = len(manga.chapters)
-        manga.total_pages = sum(ch.page_count for ch in manga.chapters)
-        
-        return manga
-    
-    def _scan_chapters_optimized(self, manga_path: Path, manga_id: str) -> List[Chapter]:
-        """
-        Escaneia capítulos de um mangá com algoritmo otimizado.
-        
-        Processa todos os subdiretórios como capítulos, usando:
-        - os.scandir() para descoberta rápida de diretórios
-        - Ordenação natural (Chapter 1, Chapter 2, Chapter 10)
-        - Parser melhorado de nomes de capítulos
-        - Fallback robusto em caso de erros
-        
-        Args:
-            manga_path (Path): Diretório do mangá
-            manga_id (str): ID único do mangá para geração de IDs de capítulo
-            
-        Returns:
-            List[Chapter]: Lista de capítulos encontrados e processados
-            
-        Chapter Detection:
-            - Qualquer subdiretório é considerado capítulo
-            - Ignora diretórios que começam com '.' (ocultos)
-            - Suporta múltiplos padrões de nomeação (Capítulo 1, Ch 1, 001)
-            - Fallback para ordenação sequencial se número não detectado
-        """
-        chapters = []
-        sequential_index = 1
-        
         try:
-            with os.scandir(manga_path) as entries:
-                chapter_entries = [entry for entry in entries if entry.is_dir() and not entry.name.startswith('.')]
-        except OSError:
-            chapter_entries = [{'path': str(d), 'name': d.name} for d in manga_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
-            chapter_entries = [type('Entry', (), entry) for entry in chapter_entries]
-        
-        # Ordenar entries por nome
-        chapter_entries.sort(key=lambda e: self.chapter_parser.natural_sort_key(getattr(e, 'name', 'unknown')))
-        
-        for entry in chapter_entries:
-            try:
-                chapter_path = Path(entry.path) if hasattr(entry, 'path') else Path(entry.name)
-                if not chapter_path.is_absolute():
-                    chapter_path = manga_path / chapter_path
-                
-                chapter = self._scan_chapter_hybrid(chapter_path, manga_id, sequential_index)
-                if chapter:
-                    chapters.append(chapter)
-                    sequential_index += 1
-            except Exception as e:
-                logger.warning(f"Erro no capítulo {getattr(entry, 'name', 'unknown')}: {e}")
-                try:
-                    chapter = self._scan_chapter(chapter_path, manga_id)
-                    if chapter:
-                        chapters.append(chapter)
-                        sequential_index += 1
-                except Exception as e2:
-                    logger.warning(f"Fallback falhou para {getattr(entry, 'name', 'unknown')}: {e2}")
-        
-        return chapters
-    
-    def _scan_chapter_hybrid(self, chapter_path: Path, manga_id: str, sequential_index: int) -> Optional[Chapter]:
-        try:
-            chapter_info = self.chapter_parser.parse_chapter_name_enhanced(chapter_path.name)
+            # Descobrir capítulos
+            chapter_dirs = self._discover_chapter_directories(manga_path_obj)
             
-            # Contar páginas
-            page_count = self._count_image_files_fast(chapter_path)
-            if page_count == 0:
+            if not chapter_dirs:
+                logger.warning(f"Nenhum capítulo encontrado em: {manga_path_obj.name}")
                 return None
             
-            # Criar páginas lazy
-            pages = self._create_pages_lazy(chapter_path)
+            # Processar capítulos
+            chapters = []
+            total_pages = 0
             
-            chapter_number = self.chapter_parser.determine_chapter_number(
-                chapter_info=chapter_info,
-                sequential_index=sequential_index,
-                page_count=page_count,
-                chapter_name=chapter_path.name
+            for chapter_dir in chapter_dirs:
+                chapter = self._scan_chapter(chapter_dir)
+                if chapter:
+                    chapters.append(chapter)
+                    total_pages += chapter.page_count
+            
+            if not chapters:
+                return None
+            
+            # Ordenar capítulos
+            chapters = self.chapter_parser.sort_chapters(chapters)
+            
+            # Encontrar thumbnail
+            thumbnail = self._find_thumbnail(manga_path_obj)
+            
+            # Criar mangá
+            manga = Manga(
+                id=self._generate_manga_id(manga_path_obj.name),
+                title=manga_path_obj.name,
+                path=str(manga_path_obj),
+                thumbnail=thumbnail,
+                chapters=chapters,
+                chapter_count=len(chapters),
+                total_pages=total_pages,
+                date_added=datetime.now(),
+                date_modified=datetime.fromtimestamp(manga_path_obj.stat().st_mtime)
             )
             
-            chapter_id = f"{manga_id}-ch-{chapter_number}"
+            return manga
+            
+        except Exception as e:
+            logger.error(f"Erro ao escanear mangá {manga_path_obj.name}: {e}")
+            return None
+    
+    def enable_cache(self):
+        """Habilitar cache"""
+        self.cache_enabled = True
+        logger.info("Cache habilitado")
+    
+    def disable_cache(self):
+        """Desabilitar cache"""
+        self.cache_enabled = False
+        logger.info("Cache desabilitado")
+    
+    def clear_cache(self, library_path: str) -> bool:
+        """Limpar cache da biblioteca"""
+        return self.cache.clear_cache(library_path)
+    
+    def get_cache_info(self, library_path: str) -> dict:
+        """Obter informações do cache"""
+        return self.cache.get_cache_info(library_path)
+    
+    def _discover_manga_directories(self, library_path: Path) -> List[Path]:
+        """Descobrir diretórios de mangá"""
+        manga_dirs = []
+        
+        try:
+            for item in library_path.iterdir():
+                if item.is_dir() and not item.name.startswith('.'):
+                    manga_dirs.append(item)
+        except OSError as e:
+            logger.error(f"Erro ao ler biblioteca: {e}")
+        
+        return sorted(manga_dirs)
+    
+    def _discover_chapter_directories(self, manga_path: Path) -> List[Path]:
+        """Descobrir diretórios de capítulos"""
+        chapter_dirs = []
+        
+        try:
+            for item in manga_path.iterdir():
+                if item.is_dir():
+                    # Verificar se tem imagens
+                    if self._has_images(item):
+                        chapter_dirs.append(item)
+        except OSError as e:
+            logger.error(f"Erro ao ler mangá: {e}")
+        
+        return chapter_dirs
+    
+    def _scan_chapter(self, chapter_path: Path) -> Optional[Chapter]:
+        """Escanear um capítulo"""
+        try:
+            # Encontrar imagens
+            image_files = self._find_image_files(chapter_path)
+            
+            if not image_files:
+                return None
+            
+            # Criar páginas
+            pages = []
+            for i, image_file in enumerate(image_files, 1):
+                page = Page(
+                    id=f"{chapter_path.name}_page_{i}",
+                    number=i,
+                    filename=image_file.name,
+                    path=str(image_file)
+                )
+                pages.append(page)
+            
+            # Analisar capítulo
+            chapter_info = self.chapter_parser.parse_chapter_name(chapter_path.name)
+            
+            # Gerar ID limpo para capítulo
+            manga_id = self._generate_manga_id(chapter_path.parent.name)
+            chapter_number = chapter_info.get('number', 0)
+            chapter_id = f"{manga_id}-ch-{int(chapter_number) if chapter_number else 1}"
             
             chapter = Chapter(
                 id=chapter_id,
                 name=chapter_path.name,
-                number=chapter_info['number'],
-                volume=chapter_info['volume'],
+                number=chapter_info.get('number', 0),
+                volume=chapter_info.get('volume'),
                 path=str(chapter_path),
                 pages=pages,
-                page_count=page_count,
-                date_added=datetime.fromtimestamp(chapter_path.stat().st_ctime)
+                page_count=len(pages),
+                date_added=datetime.now()
             )
             
             return chapter
             
         except Exception as e:
-            logger.warning(f"Erro no capítulo {chapter_path.name}: {e}")
-            return self._scan_chapter(chapter_path, manga_id)
-    
-    def _count_image_files_fast(self, chapter_path: Path) -> int:
-        """Contar arquivos de imagem rapidamente"""
-        try:
-            count = 0
-            with os.scandir(chapter_path) as entries:
-                for entry in entries:
-                    if entry.is_file() and self._is_image_file_name(entry.name):
-                        count += 1
-            return count
-        except OSError:
-            return len([f for f in chapter_path.iterdir() if f.is_file() and self._is_image_file(f)])
-    
-    def _create_pages_lazy(self, chapter_path: Path) -> List[Page]:
-        """Criar páginas sem carregar metadados (lazy)"""
-        pages = []
-        
-        try:
-            image_files = []
-            with os.scandir(chapter_path) as entries:
-                for entry in entries:
-                    if entry.is_file() and self._is_image_file_name(entry.name):
-                        image_files.append(entry.name)
-        except OSError:
-            image_files = [f.name for f in chapter_path.iterdir() if f.is_file() and self._is_image_file(f)]
-        
-        image_files.sort(key=self.chapter_parser.natural_sort_key)
-        
-        # Criar objetos Page lazy
-        for filename in image_files:
-            page = Page(
-                filename=filename,
-                path=str(chapter_path / filename),
-                size=None,
-                width=None,
-                height=None
-            )
-            pages.append(page)
-        
-        return pages
-    
-    def _is_image_file_name(self, filename: str) -> bool:
-        """Verificação rápida por extensão"""
-        return Path(filename).suffix.lower() in self.supported_extensions
-    
-
-    
-    
-
-
-    
-    def _scan_library_fallback(self, library_path: str) -> Library:
-        library = Library()
-        library_path = Path(library_path)
-        
-        if not library_path.exists() or not library_path.is_dir():
-            raise ValueError(f"Caminho inválido: {library_path}")
-        
-        for manga_dir in library_path.iterdir():
-            if manga_dir.is_dir() and not manga_dir.name.startswith('.'):
-                try:
-                    manga = self.scan_manga(str(manga_dir))
-                    if manga and manga.chapters:
-                        library.add_manga(manga)
-                except Exception as e:
-                    logger.warning(f"Erro ao escanear mangá {manga_dir.name}: {e}")
-                    continue
-        
-        return library
-    
-    def scan_manga(self, manga_path: str) -> Optional[Manga]:
-        manga_path = Path(manga_path)
-        
-        if not manga_path.exists() or not manga_path.is_dir():
+            logger.error(f"Erro ao escanear capítulo {chapter_path.name}: {e}")
             return None
-        
-        manga_id = self._generate_manga_id(manga_path.name)
-        manga = Manga(
-            id=manga_id,
-            title=manga_path.name,
-            path=str(manga_path),
-            date_added=datetime.fromtimestamp(manga_path.stat().st_ctime)
-        )
-        
-        manga.thumbnail = self._find_thumbnail(manga_path)
-        
-        chapters = []
-        sequential_index = 1
-        for chapter_dir in manga_path.iterdir():
-            if chapter_dir.is_dir() and not chapter_dir.name.startswith('.'):
-                chapter = self._scan_chapter(chapter_dir, manga_id)
-                if chapter:
-                    chapters.append(chapter)
-                    sequential_index += 1
-        
-        manga.chapters = self.chapter_parser.sort_chapters(chapters)
-        manga.chapter_count = len(manga.chapters)
-        manga.total_pages = sum(ch.page_count for ch in manga.chapters)
-        
-        return manga
-    
-    def _scan_chapter(self, chapter_path: Path, manga_id: str) -> Optional[Chapter]:
-        chapter_info = self.chapter_parser.parse_chapter_name(chapter_path.name)
-        
-        pages = []
-        image_files = []
-        
-        for file_path in chapter_path.iterdir():
-            if file_path.is_file() and self._is_image_file(file_path):
-                image_files.append(file_path)
-        
-        image_files.sort(key=lambda x: self.chapter_parser.natural_sort_key(x.name))
-        
-        for i, img_path in enumerate(image_files):
-            page = Page(
-                filename=img_path.name,
-                path=str(img_path),
-                size=img_path.stat().st_size
-            )
-            pages.append(page)
-        
-        if not pages:
-            return None
-        
-        chapter_id = f"{manga_id}-ch-{chapter_info['number'] or 1}"
-        chapter = Chapter(
-            id=chapter_id,
-            name=chapter_path.name,
-            number=chapter_info['number'],
-            volume=chapter_info['volume'],
-            path=str(chapter_path),
-            pages=pages,
-            page_count=len(pages),
-            date_added=datetime.fromtimestamp(chapter_path.stat().st_ctime)
-        )
-        
-        return chapter
-    
-    
     
     def _find_thumbnail(self, manga_path: Path) -> Optional[str]:
-        """
-        Encontra thumbnail para um mangá usando estratégia de fallback.
+        """Encontrar thumbnail do mangá"""
+        # Procurar na pasta raiz
+        for ext in self.supported_extensions:
+            for pattern in ['cover', 'capa', 'thumb', 'thumbnail']:
+                thumb_file = manga_path / f"{pattern}.{ext}"
+                if thumb_file.exists():
+                    return str(thumb_file)
         
-        Procura por thumbnail na seguinte ordem de prioridade:
-        1. Arquivo de imagem na raiz do mangá (capa.jpg, cover.png, etc.)
-        2. Primeira página do primeiro capítulo (ordenado naturalmente)
+        # Usar primeira imagem da pasta raiz
+        for file in manga_path.iterdir():
+            if file.is_file() and file.suffix.lower() in self.supported_extensions:
+                return str(file)
         
-        Args:
-            manga_path (Path): Diretório do mangá
-            
-        Returns:
-            Optional[str]: Caminho absoluto para o arquivo de thumbnail ou None
-            
-        Thumbnail Strategy:
-            - Prefere arquivos na raiz (capas dedicadas)
-            - Fallback para primeira página do primeiro capítulo
-            - Usa ordenação natural para garantir ordem correta
-            - Suporta todos os formatos de imagem configuráveis
-            
-        Performance:
-            - Para na primeira imagem encontrada na raiz
-            - Só processa capítulos se necessário
-            - Cache de thumbnails mantido entre scans
-        """
-        for file_path in manga_path.iterdir():
-            if file_path.is_file() and self._is_image_file(file_path):
-                return str(file_path)
-        
-        chapters = []
-        for chapter_dir in manga_path.iterdir():
-            if chapter_dir.is_dir():
-                chapters.append(chapter_dir)
-        
-        if chapters:
-            chapters.sort(key=lambda x: self.chapter_parser.natural_sort_key(x.name))
-            first_chapter = chapters[0]
-            
-            images = []
-            for file_path in first_chapter.iterdir():
-                if file_path.is_file() and self._is_image_file(file_path):
-                    images.append(file_path)
-            
-            if images:
-                images.sort(key=lambda x: self.chapter_parser.natural_sort_key(x.name))
-                return str(images[0])
+        # Usar primeira página do primeiro capítulo
+        chapter_dirs = self._discover_chapter_directories(manga_path)
+        if chapter_dirs:
+            first_chapter = sorted(chapter_dirs)[0]
+            image_files = self._find_image_files(first_chapter)
+            if image_files:
+                return str(image_files[0])
         
         return None
     
-    def _is_image_file(self, file_path: Path) -> bool:
-        return file_path.suffix.lower() in self.supported_extensions
+    def _find_image_files(self, directory: Path) -> List[Path]:
+        """Encontrar arquivos de imagem em um diretório"""
+        image_files = []
+        
+        try:
+            for file in directory.iterdir():
+                if file.is_file() and file.suffix.lower() in self.supported_extensions:
+                    image_files.append(file)
+        except OSError:
+            pass
+        
+        return sorted(image_files)
     
-    @staticmethod
-    def _generate_manga_id(manga_title: str) -> str:
-        clean_title = manga_title.lower()
+    def _has_images(self, directory: Path) -> bool:
+        """Verificar se diretório tem imagens"""
+        try:
+            for file in directory.iterdir():
+                if file.is_file() and file.suffix.lower() in self.supported_extensions:
+                    return True
+        except OSError:
+            pass
+        
+        return False
+    
+    def _ensure_pages_loaded(self, manga: Manga) -> None:
+        """Garantir que páginas estão carregadas para mangá do cache"""
+        for chapter in manga.chapters:
+            if not chapter.pages:
+                chapter_path = Path(chapter.path)
+                if chapter_path.exists():
+                    image_files = self._find_image_files(chapter_path)
+                    pages = []
+                    
+                    for i, image_file in enumerate(image_files, 1):
+                        page = Page(
+                            id=f"{chapter.id}_page_{i}",
+                            number=i,
+                            filename=image_file.name,
+                            path=str(image_file)
+                        )
+                        pages.append(page)
+                    
+                    chapter.pages = pages
+                    chapter.page_count = len(pages)
+    
+    def _generate_manga_id(self, manga_name: str) -> str:
+        """Gerar ID legível para mangá (compatível com sistema anterior)"""
+        import re
+        clean_title = manga_name.lower()
         clean_title = re.sub(r'\W+', '-', clean_title)
         clean_title = re.sub(r'-+', '-', clean_title).strip('-')
         return clean_title
     
-
     @staticmethod
-    def validate_library_path(path: str) -> Tuple[bool, str]:
+    def validate_library_path(path: str) -> tuple[bool, str]:
+        """Validar caminho de biblioteca"""
+        from pathlib import Path
+        
         path_obj = Path(path)
         
         if not path_obj.exists():
@@ -668,21 +322,3 @@ class MangaScanner:
             return False, "Nenhuma pasta de mangá encontrada"
         
         return True, "Caminho válido"
-    
-    def disable_cache(self):
-        """Desabilitar cache híbrido (para debug/troubleshooting)"""
-        self.cache_enabled = False
-        logger.info("Cache híbrido desabilitado")
-    
-    def enable_cache(self):
-        """Reabilitar cache híbrido"""
-        self.cache_enabled = True
-        logger.info("Cache híbrido habilitado")
-    
-    def clear_cache(self, library_path: str) -> bool:
-        """Limpar cache de uma biblioteca específica"""
-        return self.cache_manager.clear_cache(library_path)
-    
-    def get_cache_info(self, library_path: str) -> Dict:
-        """Obter informações sobre o cache"""
-        return self.cache_manager.get_cache_info(library_path)

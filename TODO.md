@@ -46,11 +46,14 @@
 - [x] **Classe MangaScanner complexa demais** 
   - **Status**: **IMPLEMENTADO**
 
+- [x] **Cache híbrido complexo demais** 
+- **Solução**: Implimentação do SimpleCache
+  - **Status**: **IMPLEMENTADO**
+
 ### Desenvolvimento
 
   - **Prioridade**: Testes para MangaScanner, endpoints críticos
 
-- [ ] **Cache híbrido complexo demais** para o caso de uso atual
-  - **Avaliação**: Verificar se simplicidade não seria melhor
+
 
 

@@ -32,7 +32,7 @@ async def get_cache_info():
             "cache_enabled": scanner.cache_enabled,
             "current_library": library_state.current_path,
             "cache_info": cache_info,
-            "scanner_version": "Cache Híbrido v1.0"
+            "scanner_version": "Cache Simples v2.0"
         }
         
     except Exception as e:
@@ -40,7 +40,7 @@ async def get_cache_info():
             "cache_enabled": scanner.cache_enabled,
             "current_library": library_state.current_path,
             "cache_info": {"exists": False, "error": str(e)},
-            "scanner_version": "Cache Híbrido v1.0"
+            "scanner_version": "Cache Simples v2.0"
         }
 
 
@@ -89,7 +89,7 @@ async def clear_cache():
 @router.post("/api/cache/disable", tags=["cache"], summary="Desabilitar cache")
 async def disable_cache():
     """
-    Desabilita o sistema de cache híbrido.
+    Desabilita o sistema de cache.
     
     Returns:
         dict: Confirmação da desabilitação
@@ -102,7 +102,7 @@ async def disable_cache():
         scanner.disable_cache()
         
         return {
-            "message": "Cache híbrido desabilitado",
+            "message": "Cache desabilitado",
             "cache_enabled": False,
             "status": "disabled"
         }
@@ -118,7 +118,7 @@ async def disable_cache():
 @router.post("/api/cache/enable", tags=["cache"], summary="Habilitar cache")
 async def enable_cache():
     """
-    Habilita o sistema de cache híbrido.
+    Habilita o sistema de cache.
     
     Returns:
         dict: Confirmação da habilitação
@@ -131,7 +131,7 @@ async def enable_cache():
         scanner.enable_cache()
         
         return {
-            "message": "Cache híbrido habilitado",
+            "message": "Cache habilitado",
             "cache_enabled": True,
             "status": "enabled"
         }
