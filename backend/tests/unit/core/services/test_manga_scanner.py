@@ -220,13 +220,13 @@ class TestMangaScannerCriticalMethods:
         ]
 
         for chapter_name, expected in test_cases:
-            result = self.scanner._parse_chapter_name_enhanced(chapter_name)
+            result = self.scanner.chapter_parser.parse_chapter_name_enhanced(chapter_name)
             assert result["number"] == expected["number"], f"Falhou para: '{chapter_name}'"
             if expected["volume"] is not None:
                 assert result["volume"] == expected["volume"], f"Volume falhou para: '{chapter_name}'"
 
     def test_sort_chapters__mixed_numbering(self, sample_chapters):
-        sorted_chapters = self.scanner._sort_chapters(sample_chapters)
+        sorted_chapters = self.scanner.chapter_parser.sort_chapters(sample_chapters)
 
         assert sorted_chapters[0].number == 10.0  # Chapter 10
         assert sorted_chapters[1].number == 2.0  # Chapter 2
@@ -249,7 +249,7 @@ class TestMangaScannerCriticalMethods:
         ]
 
         for items, expected_order in test_cases:
-            sorted_items = sorted(items, key=self.scanner._natural_sort_key)
+            sorted_items = sorted(items, key=self.scanner.chapter_parser.natural_sort_key)
             assert sorted_items == expected_order
 
     def test_generate_manga_id__edge_cases(self):

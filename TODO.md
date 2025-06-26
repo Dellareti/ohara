@@ -43,13 +43,8 @@
 - [x] **Arquivo main.py muito grande** 
   - **Status**: **IMPLEMENTADO**
 
-## Problemas de Alta Urgência
-
-- [ ] **Classe MangaScanner complexa demais** (789 linhas, múltiplas responsabilidades)
-  - **Solução**: Separar em:
-    - `MangaScanner` - Lógica principal
-    - `CacheManager` - Gerenciamento de cache
-    - `ChapterParser` - Parsing de capítulos
+- [x] **Classe MangaScanner complexa demais** 
+  - **Status**: **IMPLEMENTADO**
 
 ### Desenvolvimento
 

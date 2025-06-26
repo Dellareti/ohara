@@ -1,7 +1,7 @@
 <template>
   <div class="manual-container">
     <div class="manual-header">
-      <h1>Manual de Uso - Ohara</h1>
+      <h1>Manual de Uso</h1>
       <p>Guia completo para usar o seu leitor de mangá</p>
     </div>
 
@@ -252,13 +252,12 @@ export default {
 .manual-header {
   text-align: center;
   margin-bottom: 40px;
-  padding: 40px 0;
 }
 
 .manual-header h1 {
   font-size: 2.5rem;
   margin-bottom: 10px;
-  background: linear-gradient(45deg, #4ecdc4, #44a08d);
+  background: #fff;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -319,7 +318,7 @@ export default {
 .manual-section h2 {
   font-size: 2rem;
   margin-bottom: 25px;
-  color: #4ecdc4;
+  color: #fff;
   border-bottom: 2px solid rgba(78, 205, 196, 0.3);
   padding-bottom: 10px;
 }

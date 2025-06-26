@@ -1,31 +1,31 @@
-import json
-import logging
 import os
 import re
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
-from app.core.config import get_settings, SUPPORTED_IMAGE_EXTENSIONS, CHAPTER_PATTERNS
+from app.core.config import get_settings, SUPPORTED_IMAGE_EXTENSIONS
+from app.core.services.cache_manager import CacheManager
+from app.core.services.chapter_parser import ChapterParser
 from app.models.manga import Manga, Chapter, Page, Library
 
 logger = logging.getLogger(__name__)
 
 class MangaScanner:
     """
-    Scanner de mangás com sistema de cache híbrido otimizado.
+    Scanner principal de mangás com arquitetura modular.
     
-    Esta classe é responsável por escanear bibliotecas de mangás, organizando
-    automaticamente a estrutura de pastas em objetos Manga e Chapter.
-    Implementa um sistema de cache híbrido que acelera significativamente
-    o re-escaneamento de bibliotecas grandes.
+    Esta classe orquestra o escaneamento de bibliotecas de mangás,
+    delegando responsabilidades específicas para classes especializadas:
+    - CacheManager: Gerenciamento de cache híbrido
+    - ChapterParser: Análise e ordenação de capítulos
     
     Funcionalidades principais:
     - Escaneamento paralelo de mangás para performance otimizada
-    - Cache inteligente baseado em timestamps de modificação
-    - Detecção automática de capítulos usando padrões regex
+    - Descoberta automática de estruturas de mangá
     - Lazy loading de páginas para economizar memória
     - Fallback robusto em caso de erros
     
@@ -46,22 +46,22 @@ class MangaScanner:
     
     Attributes:
         cache_enabled (bool): Controla se o cache híbrido está ativo
-        cache_file_name (str): Nome do arquivo de cache (.ohara_cache.json)
         max_workers (int): Número máximo de threads para processamento paralelo
-        cache_version (str): Versão do formato de cache para compatibilidade
     """
     
     def __init__(self):
         self.settings = get_settings()
         self.supported_extensions = SUPPORTED_IMAGE_EXTENSIONS
         
-        # Configurações do cache híbrido
+        # Configurações principais
         self.cache_enabled = True
-        self.cache_file_name = '.ohara_cache.json'
         self.max_workers = 4
-        self.cache_version = '1.0'
+        
+        # Componentes especializados
+        self.cache_manager = CacheManager()
+        self.chapter_parser = ChapterParser()
 
-        logger.info(f"MangaScanner inicializado (Cache Híbrido v{self.cache_version})")
+        logger.info(f"MangaScanner inicializado (Cache Híbrido v{self.cache_manager.cache_version})")
 
     def scan_library(self, library_path: str) -> Library:
         """
@@ -123,8 +123,8 @@ class MangaScanner:
         logger.info(f"Iniciando scan híbrido: {library_path}")
 
         # 1. Setup do cache
-        cache_file = library_path / self.cache_file_name
-        cache_data = self._load_cache_safe(cache_file)
+        cache_file = library_path / self.cache_manager.cache_file_name
+        cache_data = self.cache_manager.load_cache(cache_file)
         
         # 2. Descobrir mangás na pasta
         manga_dirs = self._get_manga_directories_fast(library_path)
@@ -146,7 +146,7 @@ class MangaScanner:
         
         # 6. Atualizar cache
         if new_mangas:
-            self._save_cache_safe(cache_file, all_mangas)
+            self.cache_manager.save_cache(cache_file, all_mangas)
         
         # 7. Criar biblioteca final
         library = Library()
@@ -205,10 +205,25 @@ class MangaScanner:
             manga_id = self._generate_manga_id(manga_dir.name)
             cache_entry = cache_data.get(manga_id)
             
-            if self._can_use_cache(manga_dir, cache_entry):
+            if self.cache_manager.can_use_cache(manga_dir, cache_entry):
                 try:
-                    manga = self._restore_manga_from_cache(cache_entry['manga_data'])
+                    manga = self.cache_manager.restore_manga_from_cache(cache_entry['manga_data'])
                     if manga:
+                        # Recriar páginas sob demanda para cada capítulo
+                        for chapter in manga.chapters:
+                            if not chapter.pages:
+                                chapter_path = Path(chapter.path)
+                                if chapter_path.exists():
+                                    chapter.pages = self._create_pages_lazy(chapter_path)
+                                    if len(chapter.pages) != chapter.page_count:
+                                        chapter.page_count = len(chapter.pages)
+                        
+                        # Buscar thumbnail se não existir
+                        if not manga.thumbnail:
+                            manga_path = Path(manga.path)
+                            if manga_path.exists():
+                                manga.thumbnail = self._find_thumbnail(manga_path)
+                        
                         cached_mangas.append(manga)
                         continue
                 except Exception as e:
@@ -219,25 +234,6 @@ class MangaScanner:
         
         return cached_mangas, dirs_to_scan
     
-    def _can_use_cache(self, manga_dir: Path, cache_entry: Optional[Dict]) -> bool:
-        """Verificar se pode usar cache baseado em timestamp"""
-        if not cache_entry:
-            return False
-        
-        if cache_entry.get('cache_version') != self.cache_version:
-            return False
-        
-        try:
-            # Comparar mtime da pasta do mangá
-            dir_mtime = manga_dir.stat().st_mtime
-            cache_timestamp = cache_entry.get('dir_mtime', 0)
-            
-            # Se pasta não foi modificada, usar cache
-            return abs(dir_mtime - cache_timestamp) < 1.0
-            
-        except OSError as e:
-            logger.warning(f"Erro ao verificar timestamp de {manga_dir.name}: {e}")
-            return False
     
     def _scan_mangas_parallel_safe(self, manga_dirs: List[Path]) -> List[Manga]:
         """
@@ -355,7 +351,7 @@ class MangaScanner:
             return None
         
         # Ordenar e estatísticas
-        manga.chapters = self._sort_chapters(chapters)
+        manga.chapters = self.chapter_parser.sort_chapters(chapters)
         manga.chapter_count = len(manga.chapters)
         manga.total_pages = sum(ch.page_count for ch in manga.chapters)
         
@@ -395,7 +391,7 @@ class MangaScanner:
             chapter_entries = [type('Entry', (), entry) for entry in chapter_entries]
         
         # Ordenar entries por nome
-        chapter_entries.sort(key=lambda e: self._natural_sort_key(getattr(e, 'name', 'unknown')))
+        chapter_entries.sort(key=lambda e: self.chapter_parser.natural_sort_key(getattr(e, 'name', 'unknown')))
         
         for entry in chapter_entries:
             try:
@@ -421,7 +417,7 @@ class MangaScanner:
     
     def _scan_chapter_hybrid(self, chapter_path: Path, manga_id: str, sequential_index: int) -> Optional[Chapter]:
         try:
-            chapter_info = self._parse_chapter_name_enhanced(chapter_path.name)
+            chapter_info = self.chapter_parser.parse_chapter_name_enhanced(chapter_path.name)
             
             # Contar páginas
             page_count = self._count_image_files_fast(chapter_path)
@@ -431,7 +427,7 @@ class MangaScanner:
             # Criar páginas lazy
             pages = self._create_pages_lazy(chapter_path)
             
-            chapter_number = self._determine_chapter_number(
+            chapter_number = self.chapter_parser.determine_chapter_number(
                 chapter_info=chapter_info,
                 sequential_index=sequential_index,
                 page_count=page_count,
@@ -482,7 +478,7 @@ class MangaScanner:
         except OSError:
             image_files = [f.name for f in chapter_path.iterdir() if f.is_file() and self._is_image_file(f)]
         
-        image_files.sort(key=self._natural_sort_key)
+        image_files.sort(key=self.chapter_parser.natural_sort_key)
         
         # Criar objetos Page lazy
         for filename in image_files:
@@ -501,211 +497,11 @@ class MangaScanner:
         """Verificação rápida por extensão"""
         return Path(filename).suffix.lower() in self.supported_extensions
     
-    @staticmethod
-    def _determine_chapter_number(chapter_info: dict, sequential_index: int, page_count: int, chapter_name: str) -> str:
-        """Determinar número do capítulo usando múltiplas estratégias"""
-        if chapter_info['number'] is not None:
-            return str(chapter_info['number'])
-        
-        return str(sequential_index)
 
-    @staticmethod
-    def _parse_chapter_name_enhanced(chapter_name: str) -> Dict:
-        """
-        Parser avançado de nomes de capítulos com suporte a múltiplos padrões.
-        
-        Detecta automaticamente números de capítulo e volume usando regex
-        otimizadas. Suporta padrões em português, inglês e variações comuns
-        encontradas em bibliotecas de mangá.
-        
-        Args:
-            chapter_name (str): Nome do diretório do capítulo
-            
-        Returns:
-            Dict: {
-                'number': float ou None - Número do capítulo detectado
-                'volume': int ou None - Número do volume (se presente)
-            }
-            
-        Supported Patterns:
-            - "Vol. 1, Ch. 15" / "Volume 1 Chapter 15"
-            - "Capítulo 1" / "Chapter 1" / "Ch. 1"
-            - "001" / "1 - Título" / "1.5"
-            - Case-insensitive matching
-            - Suporte a capítulos decimais (1.5, 2.1)
-            
-        Examples:
-            >>> _parse_chapter_name_enhanced("Capítulo 1")
-            {'number': 1.0, 'volume': None}
-            >>> _parse_chapter_name_enhanced("Vol. 2, Ch. 15.5")
-            {'number': 15.5, 'volume': 2}
-        """
-        info = {'number': None, 'volume': None}
-        
-        # Padrões específicos mais rigorosos primeiro
-        enhanced_patterns = [
-            r'[Vv]ol\.?\s*(\d+)[,]?\s*[Cc]h\.?\s*(\d+\.?\d*)',  # "Vol. 1, Ch. 15" / "Vol 3 Ch 2"
-            r'Volume\s*(\d+)\s*Chapter\s*(\d+\.?\d*)',  # "Volume 1 Chapter 1"
-            r'[Cc]hapter\s*(\d+\.?\d*)',  # "Chapter 1"
-            r'[Cc]ap[ií]tulo\s*(\d+\.?\d*)',  # "Capítulo 1"
-            r'[Cc]h\.?\s*(\d+\.?\d*)',  # "Ch. 1"
-            r'^(\d+\.?\d*)(?:\s*[-_].*)?',  # "1 - Título"
-            r'(\d+\.?\d*)(?:\s|$)',  # Números soltos
-        ]
-
-        for pattern in enhanced_patterns:
-            match = re.search(pattern, chapter_name, re.IGNORECASE)
-            if match:
-                groups = match.groups()
-                
-                if len(groups) == 1:
-                    try:
-                        info['number'] = float(groups[0])
-                        break
-                    except ValueError:
-                        continue
-                elif len(groups) == 2:
-                    try:
-                        info['volume'] = int(groups[0])
-                        info['number'] = float(groups[1])
-                        break
-                    except ValueError:
-                        continue
-        
-        return info
     
-    def _load_cache_safe(self, cache_file: Path) -> Dict:
-        """Carregar cache com tratamento seguro de erros"""
-        if not cache_file.exists():
-            return {}
-        
-        try:
-            cache_text = cache_file.read_text(encoding='utf-8')
-            cache_data = json.loads(cache_text)
-            
-            # Validar estrutura do cache
-            if not isinstance(cache_data, dict):
-                logger.info("Cache com formato inválido, ignorando")
-                return {}
-            
-            # Verificar versão do cache
-            if cache_data.get('_cache_version') != self.cache_version:
-                logger.info(f"Cache de versão antiga ({cache_data.get('_cache_version')} != {self.cache_version}), ignorando")
-                return {}
-
-            logger.info(f"Cache carregado: {len(cache_data) - 1} entradas")
-            return cache_data
-            
-        except Exception as e:
-            logger.warning(f"Erro ao carregar cache: {e}")
-            try:
-                backup_name = f"{cache_file.name}.corrupted.{int(time.time())}"
-                cache_file.rename(cache_file.parent / backup_name)
-                logger.info(f"Cache corrompido salvo como: {backup_name}")
-            except OSError as ex:
-                logger.error(f"Falha ao renomear arquivo corrompido: {ex}")
-            
-            return {}
     
-    def _save_cache_safe(self, cache_file: Path, mangas: List[Manga]) -> None:
-        """Salvar cache otimizado (sem páginas individuais)"""
-        try:
-            cache_data = {'_cache_version': self.cache_version}
-            current_time = time.time()
-            
-            for manga in mangas:
-                try:
-                    manga_path = Path(manga.path)
-                    dir_mtime = manga_path.stat().st_mtime
-                    lightweight_manga_data = self._create_lightweight_manga_for_cache(manga)
-                    
-                    cache_data[manga.id] = {
-                        'manga_data': lightweight_manga_data,
-                        'cache_timestamp': current_time,
-                        'dir_mtime': dir_mtime,
-                        'cache_version': self.cache_version
-                    }
-                except Exception as e:
-                    logger.info(f"Erro ao cachear {manga.title}: {e}")
-            
-            # Salvar atomicamente
-            temp_file = cache_file.with_suffix('.tmp')
-            
-            # Usar compactação JSON para economizar ainda mais espaço
-            cache_json = json.dumps(cache_data, separators=(',', ':'), default=str, ensure_ascii=False)
-            temp_file.write_text(cache_json, encoding='utf-8')
-            temp_file.replace(cache_file)
-            
-            # Calcular economia de espaço
-            cache_size_mb = len(cache_json) / 1024 / 1024
 
-            logger.info(f"Cache salvo: {len(mangas)} mangás ({cache_size_mb:.2f}MB)")
-            
-        except Exception as e:
-            logger.warning(f"Erro ao salvar cache: {e}")
 
-    def _restore_manga_from_cache(self, manga_data: Dict) -> Optional[Manga]:
-        """Restaurar mangá do cache e recriar páginas sob demanda"""
-        try:
-            manga = Manga(**manga_data)
-            
-            if not manga.thumbnail:
-                manga_path = Path(manga.path)
-                if manga_path.exists():
-                    manga.thumbnail = self._find_thumbnail(manga_path)
-            
-            # Recriar páginas sob demanda para cada capítulo
-            for chapter in manga.chapters:
-                if not chapter.pages:
-                    chapter_path = Path(chapter.path)
-                    if chapter_path.exists():
-                        chapter.pages = self._create_pages_lazy(chapter_path)
-
-                        if len(chapter.pages) != chapter.page_count:
-                            chapter.page_count = len(chapter.pages)
-            
-            return manga
-            
-        except Exception as e:
-            logger.warning(f"Erro ao restaurar mangá do cache: {e}")
-            return None
-
-    @staticmethod
-    def _create_lightweight_manga_for_cache(manga: Manga) -> Dict:
-        """Criar versão leve do mangá para cache (sem páginas individuais)"""
-        lightweight_chapters = []
-        
-        for chapter in manga.chapters:
-            lightweight_chapter = {
-                "id": chapter.id,
-                "name": chapter.name,
-                "number": chapter.number,
-                "volume": chapter.volume,
-                "path": chapter.path,
-                "page_count": chapter.page_count,
-                "date_added": chapter.date_added.isoformat() if chapter.date_added else None,
-                "pages": []
-            }
-            lightweight_chapters.append(lightweight_chapter)
-        
-        lightweight_manga = {
-            "id": manga.id,
-            "title": manga.title,
-            "path": manga.path,
-            "thumbnail": manga.thumbnail,
-            "chapters": lightweight_chapters,
-            "chapter_count": manga.chapter_count,
-            "total_pages": manga.total_pages,
-            "author": getattr(manga, 'author', None),
-            "artist": getattr(manga, 'artist', None),
-            "status": getattr(manga, 'status', None),
-            "genres": getattr(manga, 'genres', []),
-            "description": getattr(manga, 'description', None),
-            "date_added": manga.date_added.isoformat() if manga.date_added else None,
-            "date_modified": manga.date_modified.isoformat() if manga.date_modified else None
-        }
-        
-        return lightweight_manga
     
     def _scan_library_fallback(self, library_path: str) -> Library:
         library = Library()
@@ -751,14 +547,14 @@ class MangaScanner:
                     chapters.append(chapter)
                     sequential_index += 1
         
-        manga.chapters = self._sort_chapters(chapters)
+        manga.chapters = self.chapter_parser.sort_chapters(chapters)
         manga.chapter_count = len(manga.chapters)
         manga.total_pages = sum(ch.page_count for ch in manga.chapters)
         
         return manga
     
     def _scan_chapter(self, chapter_path: Path, manga_id: str) -> Optional[Chapter]:
-        chapter_info = self._parse_chapter_name(chapter_path.name)
+        chapter_info = self.chapter_parser.parse_chapter_name(chapter_path.name)
         
         pages = []
         image_files = []
@@ -767,7 +563,7 @@ class MangaScanner:
             if file_path.is_file() and self._is_image_file(file_path):
                 image_files.append(file_path)
         
-        image_files.sort(key=lambda x: self._natural_sort_key(x.name))
+        image_files.sort(key=lambda x: self.chapter_parser.natural_sort_key(x.name))
         
         for i, img_path in enumerate(image_files):
             page = Page(
@@ -794,39 +590,7 @@ class MangaScanner:
         
         return chapter
     
-    @staticmethod
-    def _parse_chapter_name(chapter_name: str) -> Dict:
-        info = {'number': None, 'volume': None}
-        
-        for pattern in CHAPTER_PATTERNS:
-            match = re.search(pattern, chapter_name, re.IGNORECASE)
-            if match:
-                groups = match.groups()
-                
-                if len(groups) == 1:
-                    try:
-                        info['number'] = float(groups[0])
-                    except ValueError:
-                        pass
-                elif len(groups) == 2:
-                    try:
-                        info['volume'] = int(groups[0])
-                        info['number'] = float(groups[1])
-                    except ValueError:
-                        pass
-                break
-        
-        return info
     
-    @staticmethod
-    def _sort_chapters(chapters: List[Chapter]) -> List[Chapter]:
-        def sort_key(chapter):
-            if chapter.number is not None:
-                return (0, -chapter.number)
-            else:
-                return (1, chapter.name)
-        
-        return sorted(chapters, key=sort_key)
     
     def _find_thumbnail(self, manga_path: Path) -> Optional[str]:
         """
@@ -863,7 +627,7 @@ class MangaScanner:
                 chapters.append(chapter_dir)
         
         if chapters:
-            chapters.sort(key=lambda x: self._natural_sort_key(x.name))
+            chapters.sort(key=lambda x: self.chapter_parser.natural_sort_key(x.name))
             first_chapter = chapters[0]
             
             images = []
@@ -872,7 +636,7 @@ class MangaScanner:
                     images.append(file_path)
             
             if images:
-                images.sort(key=lambda x: self._natural_sort_key(x.name))
+                images.sort(key=lambda x: self.chapter_parser.natural_sort_key(x.name))
                 return str(images[0])
         
         return None
@@ -887,38 +651,6 @@ class MangaScanner:
         clean_title = re.sub(r'-+', '-', clean_title).strip('-')
         return clean_title
     
-    @staticmethod
-    def _natural_sort_key(text: str) -> List:
-        """
-        Gera chave de ordenação natural para strings com números.
-        
-        Implementa algoritmo de ordenação natural que trata números como
-        inteiros em vez de strings, garantindo ordem lógica:
-        
-        Ordenação alfabética: ["1", "10", "2", "20"]
-        Ordenação natural: ["1", "2", "10", "20"]
-        
-        Args:
-            text (str): String a ser convertida para chave de ordenação
-            
-        Returns:
-            List: Lista mista de inteiros e strings para ordenação
-            
-        Examples:
-            >>> _natural_sort_key("Chapter 1")
-            ['chapter ', 1]
-            >>> _natural_sort_key("Capítulo 10")
-            ['capítulo ', 10]
-            
-        Use Cases:
-            - Ordenação de capítulos: "Cap 1", "Cap 2", "Cap 10"
-            - Ordenação de páginas: "001.jpg", "002.jpg", "010.jpg"
-            - Ordenação de mangás com números nos nomes
-        """
-        def convert(text):
-            return int(text) if text.isdigit() else text.lower()
-        
-        return [convert(c) for c in re.split('([0-9]+)', text)]
 
     @staticmethod
     def validate_library_path(path: str) -> Tuple[bool, str]:
@@ -949,35 +681,8 @@ class MangaScanner:
     
     def clear_cache(self, library_path: str) -> bool:
         """Limpar cache de uma biblioteca específica"""
-        try:
-            cache_file = Path(library_path) / self.cache_file_name
-            if cache_file.exists():
-                cache_file.unlink()
-                logger.info(f"Cache limpo: {cache_file}")
-                return True
-            return False
-        except Exception as e:
-            logger.warning(f"Erro ao limpar cache: {e}")
-            return False
+        return self.cache_manager.clear_cache(library_path)
     
     def get_cache_info(self, library_path: str) -> Dict:
         """Obter informações sobre o cache"""
-        cache_file = Path(library_path) / self.cache_file_name
-        
-        if not cache_file.exists():
-            return {"exists": False}
-        
-        try:
-            stat = cache_file.stat()
-            cache_data = self._load_cache_safe(cache_file)
-            
-            return {
-                "exists": True,
-                "size_bytes": stat.st_size,
-                "size_mb": round(stat.st_size / 1024 / 1024, 2),
-                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "entries": len(cache_data) - 1,
-                "version": cache_data.get('_cache_version', 'unknown')
-            }
-        except Exception as e:
-            return {"exists": True, "error": str(e)}
+        return self.cache_manager.get_cache_info(library_path)
