@@ -5,6 +5,7 @@
 - Raquel Gonçalves Rosa
 
 ## Descrição do Sistema
+
 Sistema web para leitura de mangás organizados localmente. O Ohara escaneia estruturas de pastas contendo mangás, organiza automaticamente por capítulos e oferece uma interface intuitiva para leitura com acompanhamento de progresso.
 
 **Funcionalidades principais:**
@@ -14,6 +15,36 @@ Sistema web para leitura de mangás organizados localmente. O Ohara escaneia est
 - Sistema de cache híbrido para alta performance
 - Acompanhamento de progresso de leitura
 - Servir de imagens com validação de segurança
+
+## Screenshots
+
+<div align="center">
+
+### Interface Principal
+![Tela Principal](imagens/1.png)
+
+### Biblioteca de Mangás
+![Biblioteca](imagens/3.png)
+
+### Navegação de Capítulos
+![Navegação](imagens/4.png)
+
+### Página de Leitura
+![Leitura](imagens/6.png)
+
+### Configurações
+![Config](imagens/8.png)
+
+### Manual
+![Manual](imagens/9.png)
+
+</div>
+
+## Demonstração
+
+[![Vídeo de Demonstração](imagens/1.png)](ohara.mp4)
+
+*Clique na imagem acima para assistir ao vídeo de demonstração do sistema*
 
 ## Tecnologias Utilizadas
 
