@@ -1,9 +1,8 @@
 ﻿from datetime import datetime
 
-import pytest
-
 from app.core.services.chapter_parser import ChapterParser
 from app.models.manga import Chapter
+
 
 class TestChapterParserMethods:
     def setup_method(self):
