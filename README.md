@@ -98,7 +98,7 @@ npm run dev
 ```
 **Frontend:** http://localhost:5173
 
-## 📂 Estrutura da Biblioteca
+## Estrutura da Biblioteca
 
 O Ohara funciona esperando esse tipo de organização, e recomenda-se:
 
@@ -192,21 +192,21 @@ pytest tests/unit/models/test_manga.py
 
 ### Problemas Comuns
 
-**❌ "Pasta não contém subdiretórios"**
+** "Pasta não contém subdiretórios"**
 - Verifique se há pastas de mangás na biblioteca
 - Certifique-se de que mangás têm subpastas de capítulos
 
-**❌ "Caminho não encontrado"**
+** "Caminho não encontrado"**
 - Confirme se o caminho existe e está correto
 - Verifique permissões de leitura
 - Evite caracteres especiais no caminho
 
-**❌ "Imagens não carregam"**
+** "Imagens não carregam"**
 - Confirme formatos suportados (JPG, PNG, GIF, WebP)
 - Verifique se backend está rodando na porta 8000
 - Limpe cache: acesse http://localhost:8000/api/cache/clear
 
-**❌ "Performance lenta"**
+** "Performance lenta"**
 - Verifique cache: http://localhost:8000/api/cache/info
 - Evite bibliotecas em drives de rede
 - Considere usar SSD para bibliotecas grandes
